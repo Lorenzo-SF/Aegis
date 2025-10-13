@@ -44,7 +44,8 @@ defmodule Aegis.Tui.Renderer do
     Enum.with_index(lines, 1)
     |> Enum.each(fn {line, idx} ->
       y_pos = start_y + idx - 1
-      Printer.write_at(line, start_x, y_pos)
+      IO.inspect(line, label: "line =>", limit: :infinity, printable_limit: :infinity, charlist: :as_lists)
+      IO.write("\e[#{y_pos};#{start_x}H#{line}")
     end)
   end
 
@@ -53,7 +54,6 @@ defmodule Aegis.Tui.Renderer do
     IO.warn("Logo cache no inicializado, se omite renderizado")
     ""
   end
-
   defp logo_width(), do: calculate_logo_width(LogoCache.get_logo() || [])
   defp logo_start_x(), do: 2
   defp logo_start_y(), do: 2
@@ -78,23 +78,11 @@ defmodule Aegis.Tui.Renderer do
   """
   def render_search(state, y_pos, x_offset) do
     search_display =
-      if String.trim(state.search_term) == "",
-        do: "[escribe para filtrar]",
-        else: "#{state.search_term}_"
+      if String.trim(state.search_term) == "", do: "[escribe para filtrar]", else: "#{state.search_term}_"
 
     chunks = [
-      %ChunkText{
-        text: "Buscar: ",
-        pos_x: x_offset,
-        pos_y: y_pos,
-        color: Color.get_color_info(:info)
-      },
-      %ChunkText{
-        text: search_display,
-        pos_x: x_offset + 8,
-        pos_y: y_pos,
-        color: Color.get_color_info(:ternary)
-      }
+      %ChunkText{text: "Buscar: ", pos_x: x_offset, pos_y: y_pos, color: Color.get_color_info(:info)},
+      %ChunkText{text: search_display, pos_x: x_offset + 8, pos_y: y_pos, color: Color.get_color_info(:ternary)}
     ]
 
     Printer.raw_message(messages: chunks)
@@ -125,12 +113,8 @@ defmodule Aegis.Tui.Renderer do
     Printer.raw_message(message: "#{prefix}#{name}", pos_x: x_pos, pos_y: y_pos, color: color)
   end
 
-  defp get_option_style(true, true, true),
-    do: {"#{@enhanced_cursor}#{@checkbox_selected} ", :ternary}
-
-  defp get_option_style(true, false, true),
-    do: {"#{@enhanced_cursor}#{@checkbox_unselected} ", :ternary}
-
+  defp get_option_style(true, true, true), do: {"#{@enhanced_cursor}#{@checkbox_selected} ", :ternary}
+  defp get_option_style(true, false, true), do: {"#{@enhanced_cursor}#{@checkbox_unselected} ", :ternary}
   defp get_option_style(true, _, _), do: {@enhanced_cursor, :ternary}
   defp get_option_style(false, true, true), do: {"  #{@checkbox_selected} ", :ternary}
   defp get_option_style(false, false, true), do: {"  #{@checkbox_unselected} ", :ternary}
@@ -159,20 +143,14 @@ defmodule Aegis.Tui.Renderer do
 
       # Limpiar y redibujar la línea anterior sin cursor
       old_option = Enum.at(new_state.filtered_options, old_state.cursor_index)
-
       if old_option do
         old_y = options_y + old_state.cursor_index
         clear_line_from(old_y, start_x)
-
-        render_option(old_option, old_state.cursor_index, old_y, start_x, %{
-          new_state
-          | cursor_index: -1
-        })
+        render_option(old_option, old_state.cursor_index, old_y, start_x, %{new_state | cursor_index: -1})
       end
 
       # Limpiar y dibujar la nueva línea con cursor
       new_option = Enum.at(new_state.filtered_options, new_state.cursor_index)
-
       if new_option do
         new_y = options_y + new_state.cursor_index
         clear_line_from(new_y, start_x)
@@ -184,5 +162,5 @@ defmodule Aegis.Tui.Renderer do
   # --- Utilidades ---
 
   # Limpia desde X hasta el final de la línea
-  defp clear_line_from(y_pos, x_pos), do: Printer.clear_position(y_pos, x_pos)
+  defp clear_line_from(y_pos, x_pos), do: IO.write("\e[#{y_pos};#{x_pos}H\e[K")
 end

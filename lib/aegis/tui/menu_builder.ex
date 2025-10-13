@@ -9,6 +9,7 @@ defmodule Aegis.Tui.MenuBuilder do
   alias Aegis.Printer
   alias Aegis.Structs.{MenuInfo, MenuOption, MenuState}
   alias Aegis.Tui.LogoCache
+  alias Argos.Structs.CommandResult
 
   @doc """
   Crea un MenuInfo dinámico para uso en raw terminal mode.
@@ -141,9 +142,13 @@ defmodule Aegis.Tui.MenuBuilder do
     gradients = Enum.map_join(gradient_hexes, " ", fn h -> "'#{h}'" end)
 
     cmd = "echo '#{lines}' | gterm #{gradients}"
-    result = Argos.exec_command(cmd) |> Map.get(:output) |> IO.puts()
 
-    if result.success?, do: String.split(result.output, "\n"), else: String.split(lines, "\n")
+    %CommandResult{
+      output: output,
+      success?: success
+    } = Argos.exec_command(cmd)
+
+    if success, do: String.split(output, "\n"), else: String.split(lines, "\n")
   end
 
   @doc """
@@ -159,7 +164,9 @@ defmodule Aegis.Tui.MenuBuilder do
   defp add_back_option(options, nil), do: options
 
   defp add_back_option(options, parent) do
-    if Enum.any?(options, &(&1.id == :back)), do: options, else: [create_back_option(parent) | options]
+    if Enum.any?(options, &(&1.id == :back)),
+      do: options,
+      else: [create_back_option(parent) | options]
   end
 
   defp add_next_option(options, true, next_action) when not is_nil(next_action),
@@ -208,7 +215,11 @@ defmodule Aegis.Tui.MenuBuilder do
     |> Enum.map(& &1.name)
   end
 
-  defp get_config_value(config, key, default) when is_map(config), do: Map.get(config, key, default)
-  defp get_config_value(config, key, default) when is_list(config), do: Keyword.get(config, key, default)
+  defp get_config_value(config, key, default) when is_map(config),
+    do: Map.get(config, key, default)
+
+  defp get_config_value(config, key, default) when is_list(config),
+    do: Keyword.get(config, key, default)
+
   defp get_config_value(_, _, default), do: default
 end

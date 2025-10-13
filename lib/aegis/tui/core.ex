@@ -35,6 +35,11 @@ defmodule Aegis.Tui.Core do
           {:execute, option} ->
             handle_option_execution(state, option)
 
+          {:exit, :cancelled} ->
+            # Salir directamente de la aplicación al presionar ESC
+            Terminal.cleanup_raw_terminal()
+            System.halt(0)
+          
           {:exit, result} ->
             result
         end

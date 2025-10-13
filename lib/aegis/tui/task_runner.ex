@@ -166,7 +166,11 @@ defmodule Aegis.Tui.TaskRunner do
       |> Enum.map(fn {{description, func}, index} ->
         Task.async(fn ->
           try do
-            result = _execute_task(func, fn progress -> send(ui_pid, {:progress_update, index, progress}) end)
+            result =
+              _execute_task(func, fn progress ->
+                send(ui_pid, {:progress_update, index, progress})
+              end)
+
             send(ui_pid, {:progress_update, index, {:complete, result}})
             {description, :success, result}
           rescue
@@ -215,7 +219,9 @@ defmodule Aegis.Tui.TaskRunner do
         new_state = _update_task_state(state, task_id, progress_info)
         _render_async_ui(new_state, header, state)
         _ui_loop(new_state, header, refresh_interval, state)
-      :stop -> :ok
+
+      :stop ->
+        :ok
     after
       refresh_interval ->
         if is_nil(previous_state), do: _render_async_ui(state, header, nil)
@@ -227,21 +233,50 @@ defmodule Aegis.Tui.TaskRunner do
     Enum.map(state, fn task ->
       if task.id == task_id do
         case progress_info do
-          {:step, step} -> %{task | step: step, status: :processing}
-          progress when is_integer(progress) -> %{task | progress: progress, status: :processing}
-          {:status, s} -> %{task | status: s}
-          {:complete, _} -> %{task | status: :success, progress: 100}
-          {:error, _} -> %{task | status: :error, progress: 0}
-          {:context, _} -> task
-          {:metadata, _} -> task
-          {:recovery_options, _} -> task
-          {:severity, sev} -> %{task | status: if(sev in [:high, :critical], do: :error, else: :success)}
-          {:category, _} -> task
-          {:custom, _t, _d} -> task
-          {:custom_options, _} -> task
-          {:warning, w} -> %{task | status: :success, step: "Warning: #{w}"}
-          {:info, i} -> %{task | step: i}
-          _ -> task
+          {:step, step} ->
+            %{task | step: step, status: :processing}
+
+          progress when is_integer(progress) ->
+            %{task | progress: progress, status: :processing}
+
+          {:status, s} ->
+            %{task | status: s}
+
+          {:complete, _} ->
+            %{task | status: :success, progress: 100}
+
+          {:error, _} ->
+            %{task | status: :error, progress: 0}
+
+          {:context, _} ->
+            task
+
+          {:metadata, _} ->
+            task
+
+          {:recovery_options, _} ->
+            task
+
+          {:severity, sev} ->
+            %{task | status: if(sev in [:high, :critical], do: :error, else: :success)}
+
+          {:category, _} ->
+            task
+
+          {:custom, _t, _d} ->
+            task
+
+          {:custom_options, _} ->
+            task
+
+          {:warning, w} ->
+            %{task | status: :success, step: "Warning: #{w}"}
+
+          {:info, i} ->
+            %{task | step: i}
+
+          _ ->
+            task
         end
       else
         task
@@ -250,7 +285,9 @@ defmodule Aegis.Tui.TaskRunner do
   end
 
   defp _render_async_ui(current_state, header, previous_state) do
-    if previous_state == nil, do: _initialize_async_screen(current_state, header), else: _update_changed_task_rows(current_state, previous_state)
+    if previous_state == nil,
+      do: _initialize_async_screen(current_state, header),
+      else: _update_changed_task_rows(current_state, previous_state)
   end
 
   defp _initialize_async_screen(state, header) do
@@ -270,16 +307,45 @@ defmodule Aegis.Tui.TaskRunner do
   end
 
   defp _render_async_header(header, table_start_y) do
-    Printer.write_colored_at(header, pos_x: @table_start_x, pos_y: table_start_y + @header_offset, color: :info)
+    Printer.write_colored_at(header,
+      pos_x: @table_start_x,
+      pos_y: table_start_y + @header_offset,
+      color: :info
+    )
   end
 
   defp _render_async_table_headers(table_start_y) do
-    Printer.write_at(String.duplicate("─", 90), @table_start_x - 1, table_start_y + @separator_top_offset)
-    Printer.write_at(String.duplicate("─", 90), @table_start_x - 1, table_start_y + @separator_bottom_offset)
-    Printer.write_colored_at("Task", pos_x: @table_start_x, pos_y: table_start_y + @table_headers_offset)
-    Printer.write_colored_at("Status", pos_x: @table_start_x + @first_col_width, pos_y: table_start_y + @table_headers_offset)
-    Printer.write_colored_at("Progress", pos_x: @table_start_x + @second_col_width, pos_y: table_start_y + @table_headers_offset)
-    Printer.write_colored_at("Step", pos_x: @table_start_x + @third_col_width, pos_y: table_start_y + @table_headers_offset)
+    Printer.write_at(
+      String.duplicate("─", 90),
+      @table_start_x - 1,
+      table_start_y + @separator_top_offset
+    )
+
+    Printer.write_at(
+      String.duplicate("─", 90),
+      @table_start_x - 1,
+      table_start_y + @separator_bottom_offset
+    )
+
+    Printer.write_colored_at("Task",
+      pos_x: @table_start_x,
+      pos_y: table_start_y + @table_headers_offset
+    )
+
+    Printer.write_colored_at("Status",
+      pos_x: @table_start_x + @first_col_width,
+      pos_y: table_start_y + @table_headers_offset
+    )
+
+    Printer.write_colored_at("Progress",
+      pos_x: @table_start_x + @second_col_width,
+      pos_y: table_start_y + @table_headers_offset
+    )
+
+    Printer.write_colored_at("Step",
+      pos_x: @table_start_x + @third_col_width,
+      pos_y: table_start_y + @table_headers_offset
+    )
   end
 
   defp _render_all_task_rows(state, table_start_y) do
@@ -289,27 +355,51 @@ defmodule Aegis.Tui.TaskRunner do
 
   defp _render_task_row(task_id, task, table_start_y) do
     row_y = table_start_y + @first_row_offset + task_id
-    Printer.clear_line_portion(row_y, @table_start_x)
+
+    # Limpiar línea antes de escribir nuevos contenidos
+    Printer.write_at(
+      "                                                                                                ",
+      @table_start_x,
+      row_y
+    )
+
     String.slice(task.description, 0, @description_size)
     |> String.pad_trailing(@description_size, " ")
     |> Printer.write_colored_at(pos_x: @table_start_x, pos_y: row_y, color: :secondary)
 
-    status_text = Map.get(@status_labels, task.status, "") |> String.pad_trailing(@status_size, " ")
-    Printer.write_colored_at(status_text, pos_x: @table_start_x + @first_col_width, pos_y: row_y, color: task.status)
+    status_text =
+      Map.get(@status_labels, task.status, "") |> String.pad_trailing(@status_size, " ")
 
-    Printer.render_progress_bar(task.progress)
-    |> Printer.write_colored_at(pos_x: @table_start_x + @second_col_width, pos_y: row_y, color: task.status)
+    Printer.write_colored_at(status_text,
+      pos_x: @table_start_x + @first_col_width,
+      pos_y: row_y,
+      color: task.status
+    )
+
+    progress_text = Printer.render_progress_bar(task.progress)
+
+    Printer.write_colored_at(progress_text,
+      pos_x: @table_start_x + @second_col_width,
+      pos_y: row_y,
+      color: task.status
+    )
 
     String.slice(task.step, 0, @step_size)
     |> String.pad_trailing(@step_size, " ")
-    |> Printer.write_colored_at(pos_x: @table_start_x + @third_col_width, pos_y: row_y, color: :secondary)
+    |> Printer.write_colored_at(
+      pos_x: @table_start_x + @third_col_width,
+      pos_y: row_y,
+      color: :secondary
+    )
   end
 
   defp _find_state_changes(current_state, previous_state) do
     Enum.with_index(current_state)
     |> Enum.filter(fn {cur, idx} ->
       prev = Enum.at(previous_state, idx)
-      prev == nil or cur.status != prev.status or cur.progress != prev.progress or cur.step != prev.step
+
+      prev == nil or cur.status != prev.status or cur.progress != prev.progress or
+        cur.step != prev.step
     end)
     |> Enum.map(fn {task, idx} -> {idx, task} end)
   end
@@ -341,9 +431,11 @@ defmodule Aegis.Tui.TaskRunner do
     summary_y = table_end_y + @summary_spacing
 
     # Mensaje de resumen de tareas
-    summary_text = if error_count == 0,
-      do: "[✓] - Todas las tareas completadas exitosamente (#{success_count}/#{length(final_state)})",
-      else: "[✗] - #{success_count} completadas, #{error_count} fallaron"
+    summary_text =
+      if error_count == 0,
+        do:
+          "[✓] - Todas las tareas completadas exitosamente (#{success_count}/#{length(final_state)})",
+        else: "[✗] - #{success_count} completadas, #{error_count} fallaron"
 
     color = if error_count == 0, do: :success, else: :error
     Printer.write_colored_at(summary_text, pos_x: @table_start_x, pos_y: summary_y, color: color)
@@ -352,19 +444,30 @@ defmodule Aegis.Tui.TaskRunner do
     if description do
       desc_text =
         case description do
-          fun when is_function(fun, 0) -> fun.()   # función que devuelve string
-          text when is_binary(text) -> text        # string directo
+          # función que devuelve string
+          fun when is_function(fun, 0) -> fun.()
+          # string directo
+          text when is_binary(text) -> text
           _ -> nil
         end
 
       if desc_text do
-        Printer.write_colored_at(desc_text, pos_x: @table_start_x, pos_y: summary_y + 1, color: :info)
+        Printer.write_colored_at(desc_text,
+          pos_x: @table_start_x,
+          pos_y: summary_y + 1,
+          color: :info
+        )
       end
     end
 
     # Mensaje de retorno al menú
     return_y = summary_y + @summary_spacing
-    Printer.write_colored_at("Presiona [ENTER] para regresar al menú...", pos_x: @table_start_x, pos_y: return_y, color: :secondary)
+
+    Printer.write_colored_at("Presiona [ENTER] para regresar al menú...",
+      pos_x: @table_start_x,
+      pos_y: return_y,
+      color: :secondary
+    )
   end
 
   defp _wait_for_return_to_menu do

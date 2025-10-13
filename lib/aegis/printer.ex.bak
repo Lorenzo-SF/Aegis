@@ -218,7 +218,7 @@ defmodule Aegis.Printer do
     pos_x = Keyword.get(opts, :pos_x, 0)
 
     text
-    |> Format.add_location_to_text(pos_y, pos_x)
+    |> add_location_to_text(pos_y, pos_x)
     |> Color.apply_color(color)
     |> IO.write()
   end
@@ -237,7 +237,7 @@ defmodule Aegis.Printer do
   @spec clear_line_portion(integer(), integer()) :: :ok
   def clear_line_portion(y, start_x) do
     ""
-    |> Format.add_location_to_text(y, start_x)
+    |> add_location_to_text(y, start_x)
     |> IO.write()
   end
 
@@ -266,7 +266,7 @@ defmodule Aegis.Printer do
   """
   @spec position_cursor(integer(), integer()) :: String.t()
   def position_cursor(y, x) do
-    Format.add_location_to_text("", y, x)
+    add_location_to_text("", y, x)
   end
 
   @doc """
@@ -319,6 +319,10 @@ defmodule Aegis.Printer do
     str
     |> String.replace(~r/\e\[[0-9;]*m/, "")
     |> String.length()
+  end
+
+  defp add_location_to_text(text, pos_y, pos_x) do
+    "\e[#{pos_y};#{pos_x}H#{text}"
   end
 
   @doc """
@@ -1341,7 +1345,6 @@ defmodule Aegis.Printer do
       :ternary,
       :right
     )
-
     Process.sleep(2000)
   end
 

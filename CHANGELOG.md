@@ -162,5 +162,29 @@ Primera versión alpha de Aegis como parte del refactor de Proyecto Ypsilon.
 - Menús interactivos iniciales
 - Control de terminal básico (antes Pussycat)
 
+## Versión 1.0.3 (2025-09-26)
+
+### 🔧 Refactoring
+
+- Refactor y fix de Printer. Actualizacion de documentación
+
+## Versión 1.0.2 (2025-09-25)
+
+### 🔧 Refactoring
+
+- Refactor nombres de funciones de "Animation"
+
+## Versión 1.0.1 (2025-09-24)
+
+### 
+
+- Refactor de "Tui" porque en algunas ocasiones da problemas de compilacion
+
+## Versión 1.0.0 (2025-09-24)
+
+### 
+
+- Publicacion libreria
+
 [Unreleased]: https://github.com/usuario/aegis/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/usuario/aegis/releases/tag/v1.0.0

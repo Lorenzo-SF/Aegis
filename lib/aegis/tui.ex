@@ -4,7 +4,7 @@ defmodule Aegis.Tui do
 
   Coordina módulos especializados:
   - Terminal: Manejo del terminal raw mode
-  - Renderer: Renderizado usando Aegis.Printer.message
+  - Renderer`: Renderizado usando Aegis.Printer.message
   - InputHandler: Manejo de entrada de teclado
   - MenuBuilder: Construcción y preparación de menús
   - Core: Bucle principal del TUI

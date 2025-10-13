@@ -266,7 +266,7 @@ defmodule Aegis.Printer do
   """
   @spec position_cursor(integer(), integer()) :: String.t()
   def position_cursor(y, x) do
-    Format.add_location_to_text("", y, x)
+    add_location_to_text("", y, x)
   end
 
   @doc """
@@ -319,6 +319,10 @@ defmodule Aegis.Printer do
     str
     |> String.replace(~r/\e\[[0-9;]*m/, "")
     |> String.length()
+  end
+
+  defp add_location_to_text(text, pos_y, pos_x) do
+    "\e[#{pos_y};#{pos_x}H#{text}"
   end
 
   @doc """
@@ -785,10 +789,9 @@ defmodule Aegis.Printer do
   defp print_logo({lines, gradient_hexes}) do
     gradients = Enum.map_join(gradient_hexes, " ", fn h -> "'#{h}'" end)
 
-    # Execute the command and handle the CommandResult properly
-    result = Argos.Command.exec!("echo '#{lines}' | gterm #{gradients}")
-    IO.puts(result.output)
-    :ok
+    "echo '#{lines}' | gterm #{gradients}"
+    |> Argos.Command.exec!()
+    |> IO.puts()
   end
 
   def logo_with_data(opts \\ []) do
@@ -842,10 +845,9 @@ defmodule Aegis.Printer do
 
     gradients = Enum.map_join(gradient_hexes, " ", fn h -> "'#{h}'" end)
 
-    # Execute the command and handle the CommandResult properly
-    result = Argos.Command.exec!("echo '#{lines}' | gterm #{gradients}")
-    IO.puts(result.output)
-    :ok
+    "echo '#{lines}' | gterm #{gradients}"
+    |> Argos.Command.exec!()
+    |> IO.puts()
   end
 
   def bar(parte, total) when is_integer(parte) and is_integer(total),
@@ -1325,15 +1327,15 @@ defmodule Aegis.Printer do
   def example_questions do
     Terminal.clear_screen()
     semiheader("Preguntas e interacciones", color: :happy, align: :center)
-
+    
     # Simple question
     question("¿Cuál es tu nombre?", :primary, :left)
     Process.sleep(1000)
-
+    
     # Yes/No question
     yesno("¿Te gusta Elixir?", :secondary, :center)
     Process.sleep(1000)
-
+    
     # Question with options
     question_with_options(
       "¿Qué editor prefieres?",
@@ -1341,38 +1343,37 @@ defmodule Aegis.Printer do
       :ternary,
       :right
     )
-
     Process.sleep(2000)
   end
 
   def example_menus do
     Terminal.clear_screen()
     semiheader("Menús", color: :happy, align: :center)
-
+    
     options = [
       %Aegis.Structs.MenuOption{
-        id: 1,
-        name: "Opción 1",
+        id: 1, 
+        name: "Opción 1", 
         description: "Primera opción",
         action_type: :navigation,
         action: :option1
       },
       %Aegis.Structs.MenuOption{
-        id: 2,
-        name: "Opción 2",
+        id: 2, 
+        name: "Opción 2", 
         description: "Segunda opción",
         action_type: :navigation,
         action: :option2
       },
       %Aegis.Structs.MenuOption{
-        id: 3,
-        name: "Opción 3",
+        id: 3, 
+        name: "Opción 3", 
         description: "Tercera opción",
         action_type: :navigation,
         action: :option3
       }
     ]
-
+    
     menu("Menú de ejemplo", options, :primary, :left)
     Process.sleep(2000)
   end
@@ -1380,10 +1381,10 @@ defmodule Aegis.Printer do
   def example_logos do
     Terminal.clear_screen()
     semiheader("Logos", color: :happy, align: :center)
-
+    
     start_logo(align: :center)
     Process.sleep(2000)
-
+    
     logo_with_data()
     Process.sleep(2000)
   end

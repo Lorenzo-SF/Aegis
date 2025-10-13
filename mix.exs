@@ -26,71 +26,7 @@ defmodule Aegis.MixProject do
 
   def application do
     [
-      extra_applications: [:logger]
-    ]
-  end
-
-defp aliases do
-    [
-      credo: ["format --check-formatted", "credo --strict --format=oneline"],
-      quality: [
-        "deps.get",
-        "clean",
-        "compile --warnings-as-errors",
-        "cmd MIX_ENV=test mix test",
-        "credo --strict",
-        "dialyzer",
-        "cmd 'echo \\\"quality terminado\"'"
-      ],
-      ci: [
-        "deps.get",
-        "clean",
-        "compile --warnings-as-errors",
-        "cmd MIX_ENV=test mix test",
-        "credo --strict",
-        "cmd 'echo \\\"terminado terminado\"'"
-      ],
-      hex_prepare: [
-        "clean",
-        "compile --force --warnings-as-errors",
-        "format",
-        "test",
-        "docs",
-        "cmd mix hex.build"
-      ],
-      hex_publish: [
-        "hex_prepare",
-        "cmd mix hex.publish"
-      ]
-    ]
-  end
-
-  defp deps do
-    [
-      # Core dependencies - Proyecto Ypsilon
-      # Level 1A - Aurora (formatting & rendering)
-      {:aurora, "~> 1.0.4"},  # Use for published version
-      # Level 1B - Argos (command execution & task orchestration)
-      {:argos, path: "../Argos"},
-
-      # JSON handling
-      {:jason, "~> 1.4"},
-
-      # Development dependencies
-      {:credo, "~> 1.7.12", only: [:dev, :test], runtime: false},
-      {:benchee, "~> 1.3", only: :dev},
-      {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
-      {:ex_doc, "~> 0.34", runtime: false},
-      {:mix_test_watch, "~> 1.1", only: :dev, runtime: false},
-
-      # Test dependencies
-      {:propcheck, "~> 1.4", only: :test}
-    ]
-  end
-
-  def escript do
-    [
-      main_module: Aegis.CLI
+      extra_applications: [:logger, :runtime_tools, :argos, :aurora]
     ]
   end
 
@@ -136,6 +72,37 @@ defp aliases do
         "hex_prepare",
         "cmd mix hex.publish"
       ]
+    ]
+  end
+
+  defp deps do
+    [
+      # Core dependencies - Proyecto Ypsilon
+      # Level 1A - Aurora (formatting & rendering)
+      # Use for published version
+      # {:aurora, "~> 1.0.4"},
+      {:aurora, path: "../Aurora"},
+      # Level 1B - Argos (command execution & task orchestration)
+      {:argos, path: "../Argos"},
+
+      # JSON handling
+      {:jason, "~> 1.4"},
+
+      # Development dependencies
+      {:credo, "~> 1.7.12", only: [:dev, :test], runtime: false},
+      {:benchee, "~> 1.3", only: :dev},
+      {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
+      {:ex_doc, "~> 0.34", runtime: false},
+      {:mix_test_watch, "~> 1.1", only: :dev, runtime: false},
+
+      # Test dependencies
+      {:propcheck, "~> 1.4", only: :test}
+    ]
+  end
+
+  def escript do
+    [
+      main_module: Aegis.CLI
     ]
   end
 
