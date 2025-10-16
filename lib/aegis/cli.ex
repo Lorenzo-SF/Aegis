@@ -83,7 +83,11 @@ defmodule Aegis.CLI do
 
   # Success message command
   defp success_command(args) do
-    message = Enum.join(Enum.slice(args, 1..-1), " ")
+    message = 
+      case args do
+        [_head | tail] -> Enum.join(tail, " ")
+        [] -> ""
+      end
     
     if message != "" do
       Aegis.success(message)
@@ -95,7 +99,11 @@ defmodule Aegis.CLI do
 
   # Error message command
   defp error_command(args) do
-    message = Enum.join(Enum.slice(args, 1..-1), " ")
+    message = 
+      case args do
+        [_head | tail] -> Enum.join(tail, " ")
+        [] -> ""
+      end
     
     if message != "" do
       Aegis.error(message)
@@ -107,7 +115,11 @@ defmodule Aegis.CLI do
 
   # Warning message command
   defp warning_command(args) do
-    message = Enum.join(Enum.slice(args, 1..-1), " ")
+    message = 
+      case args do
+        [_head | tail] -> Enum.join(tail, " ")
+        [] -> ""
+      end
     
     if message != "" do
       Aegis.warning(message)
@@ -119,7 +131,11 @@ defmodule Aegis.CLI do
 
   # Info message command
   defp info_command(args) do
-    message = Enum.join(Enum.slice(args, 1..-1), " ")
+    message = 
+      case args do
+        [_head | tail] -> Enum.join(tail, " ")
+        [] -> ""
+      end
     
     if message != "" do
       Aegis.info(message)
@@ -131,7 +147,11 @@ defmodule Aegis.CLI do
 
   # Debug message command
   defp debug_command(args) do
-    message = Enum.join(Enum.slice(args, 1..-1), " ")
+    message = 
+      case args do
+        [_head | tail] -> Enum.join(tail, " ")
+        [] -> ""
+      end
     
     if message != "" do
       Aegis.debug(message)
@@ -163,7 +183,11 @@ defmodule Aegis.CLI do
 
   # Header command
   defp header_command(args) do
-    text = Enum.join(Enum.slice(args, 1..-1), " ")
+    text = 
+      case args do
+        [_head | tail] -> Enum.join(tail, " ")
+        [] -> ""
+      end
     
     if text != "" do
       Aegis.header([text])
@@ -180,20 +204,28 @@ defmodule Aegis.CLI do
 
   # Question command
   defp question_command(args) do
-    text = Enum.join(Enum.slice(args, 1..-1), " ")
+    text = 
+      case args do
+        [_head | tail] -> Enum.join(tail, " ")
+        [] -> ""
+      end
     
     if text != "" do
       # Since this is CLI context, just print the question
       Aegis.question(text)
     else
-      IO.puts("Error: Missing text for question command")
+      IO.puts("Error: Missing message for question command")
       show_help()
     end
   end
 
   # Confirm (yesno) command
   defp confirm_command(args) do
-    text = Enum.join(Enum.slice(args, 1..-1), " ")
+    text = 
+      case args do
+        [_head | tail] -> Enum.join(tail, " ")
+        [] -> ""
+      end
     
     if text != "" do
       # Since this is CLI context, just print the confirmation
@@ -206,7 +238,11 @@ defmodule Aegis.CLI do
 
   # Animate command
   defp animate_command(args) do
-    text = Enum.join(Enum.slice(args, 1..-1), " ")
+    text = 
+      case args do
+        [_head | tail] -> Enum.join(tail, " ")
+        [] -> ""
+      end
     
     if text != "" do
       # Start animation and exit immediately in CLI context

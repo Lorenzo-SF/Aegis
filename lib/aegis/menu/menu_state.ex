@@ -1,5 +1,5 @@
-defmodule Aegis.Structs.MenuState do
-  @moduledoc "Menu option structure for CLI menu items."
+defmodule Aegis.Structs.MenuState  do
+  @moduledoc "Menu state structure for CLI menu management."
   alias Aegis.Structs.MenuInfo
 
   defstruct pid: nil,
@@ -8,7 +8,7 @@ defmodule Aegis.Structs.MenuState do
             cursor_index: 0,
             search_term: "",
             selected_indices: MapSet.new(),
-            terminal_size: {80, 24},
+            terminal_size: {580, 24},
             last_rendered_lines: [],
             search_history: [],
             search_history_index: -1,
@@ -17,7 +17,7 @@ defmodule Aegis.Structs.MenuState do
   @type t :: %__MODULE__{
           pid: pid() | nil,
           menu_info: MenuInfo.t() | nil,
-          filtered_options: [MenuOption.t()],
+          filtered_options: [Aegis.Structs.MenuOption.t()],
           cursor_index: non_neg_integer(),
           search_term: String.t(),
           selected_indices: MapSet.t(any()),

@@ -121,7 +121,17 @@ defmodule Aegis.Tui.Renderer do
        ) do
     is_selected = index == cursor_index
     is_marked = MapSet.member?(selected, id)
+
     {prefix, color} = get_option_style(is_selected, is_marked, ms)
+    
+    # Escribir espacios para limpiar completamente desde x_pos hasta el final de la línea
+    # Esto evita problemas con secuencias ANSI y residuos
+    # get_terminal_size() retorna {rows, cols} = {height, width}
+    terminal_width = elem(Aegis.Tui.Terminal.get_terminal_size(), 1)
+    clear_spaces = String.duplicate(" ", terminal_width - x_pos)
+    Printer.raw_message(message: clear_spaces, pos_x: x_pos, pos_y: y_pos, color: :no_color)
+    
+    # Ahora escribir el contenido real
     Printer.raw_message(message: "#{prefix}#{name}", pos_x: x_pos, pos_y: y_pos, color: color)
   end
 
@@ -157,25 +167,22 @@ defmodule Aegis.Tui.Renderer do
       options_y = menu_y() + 4
       start_x = logo_end_x()
 
-      # Limpiar y redibujar la línea anterior sin cursor
+      # Redibujar la línea anterior sin cursor
       old_option = Enum.at(new_state.filtered_options, old_state.cursor_index)
 
       if old_option do
         old_y = options_y + old_state.cursor_index
-        clear_line_from(old_y, start_x)
-
         render_option(old_option, old_state.cursor_index, old_y, start_x, %{
           new_state
           | cursor_index: -1
         })
       end
 
-      # Limpiar y dibujar la nueva línea con cursor
+      # Dibujar la nueva línea con cursor
       new_option = Enum.at(new_state.filtered_options, new_state.cursor_index)
 
       if new_option do
         new_y = options_y + new_state.cursor_index
-        clear_line_from(new_y, start_x)
         render_option(new_option, new_state.cursor_index, new_y, start_x, new_state)
       end
     end

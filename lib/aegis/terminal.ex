@@ -1,175 +1,203 @@
+# terminal.ex
 defmodule Aegis.Terminal do
   @moduledoc """
-  Gestión de terminal cross-platform para Aegis.
+  Módulo principal para gestión de terminal cross-platform.
+  Detecta el sistema operativo y delega en la implementación correspondiente.
   """
 
-  alias Aegis.Terminal.{Iterm2, Kitty, Tmux}
-  alias Aegis.Structs.PussyConfig
+  alias Aegis.Terminal.{Bash, PowerShell}
+  alias Aegis.Terminal.ModuleInfo
 
-  # -------------------- Delegation Helper --------------------
-  defp delegate_terminal(func, config_or_opts, fallback \\ fn -> {:ok, "Terminal no soportado"} end) do
-    terminal = detected_terminal()
+  @spec get_impl() :: module()
+  defp get_impl() do
+    case :os.type() do
+      {:win32, _} -> PowerShell
+      _ -> Bash  # Unix-like systems (Linux, macOS)
+    end
+  end
 
-    target =
-      case terminal do
-        :kitty -> Kitty
-        :tmux -> Tmux
-        :iterm2 -> Iterm2
-        _ -> nil
+  # Delegación dinámica de todas las funciones del behaviour
+  @behaviour_functions [
+    :create_tab, :create_pane, :close_tab, :close_pane, :navigate_to_tab,
+    :navigate_to_pane, :send_command, :execute_command, :customize_pane,
+    :create_screen_session, :close_screen_session, :send_command_to_screen,
+    :find_screen_session, :apply_layout, :create_custom_layout,
+    :start_application, :reindex_application, :open_pod_terminal, :kill_application
+  ]
+
+  @non_behaviour_functions [:terminal_size]
+
+  for function <- @behaviour_functions do
+    args = if function in [:send_command, :execute_command, :customize_pane, :send_command_to_screen] do
+      quote do
+        [arg1, arg2]
       end
+    else
+      quote do
+        [arg]
+      end
+    end
 
-    cond do
-      target -> apply(target, func, [PussyConfig.to_opts(config_or_opts)])
-      true -> fallback.()
+    defdelegate unquote(function)(unquote_splicing(args)), to: __MODULE__, as: :"delegate_#{function}"
+  end
+
+  # Implementaciones de delegación
+  defp delegate_create_tab(opts), do: get_impl().create_tab(opts)
+  defp delegate_create_pane(opts), do: get_impl().create_pane(opts)
+  defp delegate_close_tab(tab_id), do: get_impl().close_tab(tab_id)
+  defp delegate_close_pane(pane_id), do: get_impl().close_pane(pane_id)
+  defp delegate_navigate_to_tab(tab_id), do: get_impl().navigate_to_tab(tab_id)
+  defp delegate_navigate_to_pane(pane_id), do: get_impl().navigate_to_pane(pane_id)
+  defp delegate_send_command(pane_id, command), do: get_impl().send_command(pane_id, command)
+  defp delegate_execute_command(pane_id, command), do: get_impl().execute_command(pane_id, command)
+  defp delegate_customize_pane(pane_id, colors), do: get_impl().customize_pane(pane_id, colors)
+  defp delegate_create_screen_session(session, cmd, log), do: get_impl().create_screen_session(session, cmd, log)
+  defp delegate_close_screen_session(session), do: get_impl().close_screen_session(session)
+  defp delegate_send_command_to_screen(session, cmd), do: get_impl().send_command_to_screen(session, cmd)
+  defp delegate_find_screen_session(session), do: get_impl().find_screen_session(session)
+  defp delegate_apply_layout(layout), do: get_impl().apply_layout(layout)
+  defp delegate_create_custom_layout(count, type), do: get_impl().create_custom_layout(count, type)
+  defp delegate_start_application(modules, pane_modules, layout), do: get_impl().start_application(modules, pane_modules, layout)
+  defp delegate_reindex_application(modules_indexes), do: get_impl().reindex_application(modules_indexes)
+  defp delegate_open_pod_terminal(context, pod), do: get_impl().open_pod_terminal(context, pod)
+  defp delegate_kill_application(), do: get_impl().kill_application()
+
+  # Funciones de alto nivel para los casos de uso específicos
+  @doc """
+  Inicia la aplicación Truedat con los módulos especificados.
+
+  ## Parámetros
+    - modules: Lista de ModuleInfo
+    - pane_modules: Lista de aliases de módulos que se mostrarán en panes
+    - layout_type: Tipo de layout (:default, :grid_4x4, etc.)
+  """
+  def start_truedat(modules, pane_modules \\ [], layout_type \\ :default) do
+    layout = get_layout_spec(layout_type)
+    impl = get_impl()
+    impl.start_application(modules, pane_modules, layout)
+  end
+
+  @doc """
+  Ejecuta el reindexado de la aplicación.
+
+  ## Parámetros
+    - modules: Lista de ModuleInfo con índices
+  """
+  def reindex_truedat(modules) do
+    modules_with_indexes = extract_modules_with_indexes(modules)
+    impl = get_impl()
+    impl.reindex_application(modules_with_indexes)
+  end
+
+  @doc """
+  Abre una terminal en un pod de Kubernetes.
+  """
+  def open_kubectl_pod(context, pod_name) do
+    impl = get_impl()
+    impl.open_pod_terminal(context, pod_name)
+  end
+
+  @doc """
+  Mata todos los procesos relacionados con Truedat.
+  """
+  def kill_truedat() do
+    impl = get_impl()
+    impl.kill_application()
+  end
+
+  @doc """
+  Verifica si el terminal está disponible.
+  """
+  def available? do
+    impl = get_impl()
+    # Verificación básica - podríamos verificar comandos específicos
+    case impl.create_tab(name: "test", command: "echo test") do
+      {:ok, _} -> true
+      {:error, _} -> false
     end
   end
 
-  # -------------------- Terminal detection --------------------
-  defp detected_terminal do
-    case Process.get(:detected_terminal) do
-      nil ->
-        term =
-          cond do
-            System.get_env("TMUX") -> :tmux
-            System.get_env("KITTY_WINDOW_ID") -> :kitty
-            iterm2?() -> :iterm2
-            true -> :unknown
-          end
-
-        Process.put(:detected_terminal, term)
-        term
-
-      cached -> cached
+  @doc """
+  Obtiene el tipo de terminal detectado.
+  """
+  def terminal_type do
+    case get_impl() do
+      Bash -> :bash
+      PowerShell -> :powershell
     end
   end
 
-  defp iterm2? do
-    case System.cmd("osascript", ["-e", "tell application \"System Events\" to name of first process whose frontmost is true"], stderr_to_stdout: true) do
-      {app_name, 0} -> String.contains?(String.downcase(String.trim(app_name)), "iterm")
-      _ -> false
-    end
+  # Helpers privados
+  defp get_layout_spec(:default) do
+    %{
+      rows: 4,
+      cols: 4,
+      big_pane_positions: [{1, 3}, {1, 4}, {2, 3}, {2, 4}],
+      layout_type: :grid_4x4
+    }
   end
 
-  # -------------------- Tabs / Windows / Panes --------------------
-  def create_tab(config_or_opts) do
-    config = normalize_config(config_or_opts)
-    delegate_terminal(:create_tab, config, fn -> fallback_create_tab(config) end)
+  defp get_layout_spec(:grid_4x4) do
+    %{
+      rows: 4,
+      cols: 4,
+      layout_type: :grid_4x4
+    }
   end
 
-  def create_window(config_or_opts) do
-    config = normalize_config(config_or_opts)
-    delegate_terminal(:create_window, config)
+  defp get_layout_spec(:vertical_stack) do
+    %{
+      rows: 1,
+      cols: 1,
+      layout_type: :vertical_stack
+    }
   end
 
-  def create_pane(config_or_opts) do
-    config = normalize_config(config_or_opts)
-    delegate_terminal(:create_pane, config, fn -> {:ok, "Fallback: Pane no soportado"} end)
+  defp get_layout_spec(:horizontal_split) do
+    %{
+      rows: 1,
+      cols: 1,
+      layout_type: :horizontal_split
+    }
   end
 
-  # -------------------- Commands --------------------
-  def send_command(config_or_opts) do
-    config = normalize_config(config_or_opts)
-    delegate_terminal(:send_command, config, fn -> fallback_run_command(config.command) end)
+  defp get_layout_spec(layout_type) do
+    %{layout_type: layout_type}
   end
 
-  def run_command(config_or_opts) do
-    config = normalize_config(config_or_opts)
-    delegate_terminal(:send_command, config, fn -> fallback_run_command(config.command) end)
+  defp extract_modules_with_indexes(modules) do
+    modules
+    |> Enum.flat_map(fn module ->
+      Enum.map(module.indexes, fn index ->
+        {module, index}
+      end)
+    end)
   end
 
-  defp fallback_run_command(command) do
-    case Argos.exec_command(command) do
-      {:ok, output} -> {:ok, output}
-      error -> error
-    end
-  end
-
-  # -------------------- Layouts / Styles --------------------
-  def apply_layout(config_or_opts) do
-    config = normalize_config(config_or_opts)
-    delegate_terminal(:apply_layout, config)
-  end
-
-  def apply_styles(config_or_opts) do
-    config = normalize_config(config_or_opts)
-    delegate_terminal(:apply_styles, config)
-  end
-
-  def create_trus_layout(tab_name, services) do
-    config = %PussyConfig{tab_id: tab_name}
-    delegate_terminal(:create_trus_layout, config, fn -> {:ok, %{layout: "trus_4x4", panes_created: length(services), terminal: detected_terminal()}} end)
-  end
-
-  def create_trus_services_layout(tab_name, services) do
-    config = %PussyConfig{tab_id: tab_name}
-    delegate_terminal(:create_trus_services_layout, config, fn -> {:ok, %{layout: "trus_services", panes_created: length(services), terminal: detected_terminal()}} end)
-  end
-
-  # -------------------- Navigation --------------------
-  def navigate_to(config_or_opts) do
-    config = normalize_config(config_or_opts)
-    delegate_terminal(:navigate_to, config)
-  end
-
-  # -------------------- Elements --------------------
-  def list_elements(type \\ :all), do: delegate_terminal(:list_elements, %{type: type}, fn -> {:ok, []} end)
-  def find_element(opts), do: delegate_terminal(:find_element, opts, fn -> {:error, "Elemento no encontrado"} end)
-
-  # -------------------- Element Management --------------------
-  def close_element(config_or_opts) do
-    config = normalize_config(config_or_opts)
-    delegate_terminal(:close_element, config, fn -> {:ok, "Close element not supported"} end)
-  end
-
-  # -------------------- Utilities --------------------
+  @doc """
+  Gets the current terminal size as {width, height}.
+  """
   def terminal_size do
-    width = case :io.columns() do
-      {:ok, w} -> w
-      {:error, _} -> 80  # Default width if error
-      w when is_integer(w) -> w  # In some versions it returns integer directly
-    end
-
-    height = case :io.rows() do
-      {:ok, h} -> h
-      {:error, _} -> 24  # Default height if error
-      h when is_integer(h) -> h  # In some versions it returns integer directly
-    end
-
-    {width, height}
+    get_impl().terminal_size()
   end
 
-  def terminal_width(size \\ :full) do
-    {width, _} = terminal_size()
+  @doc """
+  Gets the current terminal width.
+  """
+  def terminal_width(size \\ nil) do
     case size do
-      :full -> width
-      :half -> div(width, 2)
-      :quarter -> div(width, 4)
-      _ -> width
+      nil ->
+        {width, _height} = terminal_size()
+        width
+      _ ->
+        size
     end
   end
 
-  def autoresize(width, height) do
-    delegate_terminal(:resize, %{width: width, height: height}, fn -> {:ok, "Auto-resize no soportado"} end)
-  end
-
-  def available?, do: detected_terminal() != :unknown
-
-  def clear_screen, do: Argos.exec_command("clear")
-
-  # -------------------- Legacy helper --------------------
-  defp normalize_config(%PussyConfig{} = config), do: config
-  defp normalize_config(command) when is_binary(command), do: %PussyConfig{command: command}
-  defp normalize_config(opts) when is_list(opts), do: %PussyConfig{command: opts[:command]}
-
-  # -------------------- Fallbacks --------------------
-  defp fallback_create_tab(%PussyConfig{command: command}) do
-    case detected_terminal() do
-      :kitty ->
-        case System.cmd("kitty", ["@", "launch", "--type=tab", command], stderr_to_stdout: true) do
-          {_, 0} -> {:ok, "Tab creada en Kitty"}
-          error -> {:error, "No se pudo crear tab en Kitty: #{inspect(error)}"}
-        end
-      _ -> Argos.exec_command(command)
-    end
+  @doc """
+  Clears the terminal screen.
+  """
+  def clear_screen do
+    get_impl().clear_screen()
   end
 end

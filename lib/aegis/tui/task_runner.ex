@@ -32,11 +32,11 @@ defmodule Aegis.Tui.TaskRunner do
   @separator_bottom_offset 2
   @first_row_offset 4
   @summary_spacing 3
-  @first_col_width 30
-  @second_col_width 45
-  @third_col_width 75
+  @first_col_width 20
+  @second_col_width 30
+  @third_col_width 60
   @description_size 30
-  @step_size 50
+  @step_size 30
   @status_size 15
 
   @status_labels %{
@@ -54,7 +54,7 @@ defmodule Aegis.Tui.TaskRunner do
 
   Parámetros:
   - `task_descriptions`: lista de {desc, fn(callback)}
-  - `opts`: header, refresh_interval, capture_output, mode, auto_resize
+  - `opts`: header, refresh_interval, stderr_to_stdout, mode, auto_resize
   """
   def run(task_descriptions, opts \\ []) do
     header = Keyword.get(opts, :header, "Procesando tareas en paralelo")
@@ -174,10 +174,11 @@ defmodule Aegis.Tui.TaskRunner do
             send(ui_pid, {:progress_update, index, {:complete, result}})
             {description, :success, result}
           rescue
-            error ->
-              send(ui_pid, {:progress_update, index, {:error, error}})
-              Logger.error("Task #{description} failed: #{inspect(error)}")
-              {description, :error, error}
+            e ->
+              log_path = _write_task_error_log(description, e, __STACKTRACE__)
+              send(ui_pid, {:progress_update, index, {:error, {e, log_path}}})
+              Logger.error("Task #{description} failed: #{Exception.format(:error, e, __STACKTRACE__)}")
+              {description, :error, log_path}
           end
         end)
       end)
@@ -232,51 +233,63 @@ defmodule Aegis.Tui.TaskRunner do
   defp _update_task_state(state, task_id, progress_info) do
     Enum.map(state, fn task ->
       if task.id == task_id do
-        case progress_info do
-          {:step, step} ->
-            %{task | step: step, status: :processing}
+        # Si la tarea ya está en estado de error, no permitimos más actualizaciones
+        # excepto para completar o recibir metadatos
+        if task.status == :error and not matches_any_type(progress_info, [:complete, :metadata, :context]) do
+          task
+        else
+          case progress_info do
+            {:step, step} ->
+              %{task | step: step, status: :processing}
 
-          progress when is_integer(progress) ->
-            %{task | progress: progress, status: :processing}
+            progress when is_integer(progress) ->
+              %{task | progress: progress, status: :processing}
 
-          {:status, s} ->
-            %{task | status: s}
+            {:status, s} ->
+              %{task | status: s}
 
-          {:complete, _} ->
-            %{task | status: :success, progress: 100}
+            {:complete, _} ->
+              # Si la tarea tiene error, mantener el estado de error aun al completar
+              if task.status == :error do
+                task
+              else
+                %{task | status: :success, progress: 100}
+              end
 
-          {:error, _} ->
-            %{task | status: :error, progress: 0}
+            {:error, error} ->
+              # Registrar el error para mostrarlo
+              %{task | status: :error, progress: 0, step: "Error: #{inspect(error)}"}
 
-          {:context, _} ->
-            task
+            {:context, _} ->
+              task
 
-          {:metadata, _} ->
-            task
+            {:metadata, _} ->
+              task
 
-          {:recovery_options, _} ->
-            task
+            {:recovery_options, _} ->
+              task
 
-          {:severity, sev} ->
-            %{task | status: if(sev in [:high, :critical], do: :error, else: :success)}
+            {:severity, sev} ->
+              %{task | status: if(sev in [:high, :critical], do: :error, else: :success)}
 
-          {:category, _} ->
-            task
+            {:category, _} ->
+              task
 
-          {:custom, _t, _d} ->
-            task
+            {:custom, _t, _d} ->
+              task
 
-          {:custom_options, _} ->
-            task
+            {:custom_options, _} ->
+              task
 
-          {:warning, w} ->
-            %{task | status: :success, step: "Warning: #{w}"}
+            {:warning, w} ->
+              %{task | status: :success, step: "Warning: #{w}"}
 
-          {:info, i} ->
-            %{task | step: i}
+            {:info, i} ->
+              %{task | step: i}
 
-          _ ->
-            task
+            _ ->
+              task
+          end
         end
       else
         task
@@ -287,7 +300,7 @@ defmodule Aegis.Tui.TaskRunner do
   defp _render_async_ui(current_state, header, previous_state) do
     if previous_state == nil,
       do: _initialize_async_screen(current_state, header),
-      else: _update_changed_task_rows(current_state, previous_state)
+      else: _update_changed_task_rows_and_refresh_static_content(current_state, previous_state, header)
   end
 
   defp _initialize_async_screen(state, header) do
@@ -304,6 +317,61 @@ defmodule Aegis.Tui.TaskRunner do
     Enum.each(_find_state_changes(current_state, previous_state), fn {task_id, task} ->
       _render_task_row(task_id, task, @table_start_y)
     end)
+  end
+
+  defp _update_changed_task_rows_and_refresh_static_content(current_state, previous_state, header) do
+    # En lugar de actualizar solo filas cambiantes, volvemos a pintar todo el contenido
+    # para asegurar que todo se mantenga visible y actualizado
+    _render_full_screen(current_state, header)
+  end
+
+  defp _render_full_screen(state, header) do
+    # Pintar el logo
+    Renderer.render_logo(LogoCache.get_logo() || [], @logo_start_y, @logo_start_x)
+
+    # Pintar el header del TaskRunner
+    Printer.write_colored_at(header,
+      pos_x: @table_start_x,
+      pos_y: @table_start_y + @header_offset,
+      color: :info
+    )
+
+    # Pintar las líneas divisorias
+    Printer.write_at(
+      String.duplicate("─", 90),
+      @table_start_x - 1,
+      @table_start_y + @separator_top_offset
+    )
+
+    Printer.write_at(
+      String.duplicate("─", 90),
+      @table_start_x - 1,
+      @table_start_y + @separator_bottom_offset
+    )
+
+    # Pintar los headers de las columnas
+    Printer.write_colored_at("Task",
+      pos_x: @table_start_x,
+      pos_y: @table_start_y + @table_headers_offset
+    )
+
+    Printer.write_colored_at("Status",
+      pos_x: @table_start_x + @first_col_width,
+      pos_y: @table_start_y + @table_headers_offset
+    )
+
+    Printer.write_colored_at("Progress",
+      pos_x: @table_start_x + @second_col_width,
+      pos_y: @table_start_y + @table_headers_offset
+    )
+
+    Printer.write_colored_at("Step",
+      pos_x: @table_start_x + @third_col_width,
+      pos_y: @table_start_y + @table_headers_offset
+    )
+
+    # Pintar todas las filas de tareas con su estado actual
+    _render_all_task_rows(state, @table_start_y)
   end
 
   defp _render_async_header(header, table_start_y) do
@@ -384,13 +452,27 @@ defmodule Aegis.Tui.TaskRunner do
       color: task.status
     )
 
-    String.slice(task.step, 0, @step_size)
+    # Si el estado es error, mostrar el mensaje de error en la columna de step
+    step_text =
+      if task.status == :error and String.starts_with?(task.step, "Error:") do
+        String.slice(task.step, 0, @step_size)
+      else
+        String.slice(task.step, 0, @step_size)
+      end
     |> String.pad_trailing(@step_size, " ")
-    |> Printer.write_colored_at(
+
+    Printer.write_colored_at(
+      step_text,
       pos_x: @table_start_x + @third_col_width,
       pos_y: row_y,
-      color: :secondary
+      color: task.status  # Cambiado a task.status para que también se pinte en rojo en caso de error
     )
+  end
+
+  defp matches_any_type(progress_info, types) do
+    Enum.any?(types, fn type ->
+      match?({^type, _}, progress_info)
+    end)
   end
 
   defp _find_state_changes(current_state, previous_state) do
@@ -473,5 +555,30 @@ defmodule Aegis.Tui.TaskRunner do
   defp _wait_for_return_to_menu do
     _ = IO.gets("")
     :ok
+  end
+
+  defp _write_task_error_log(task_desc, error, stacktrace) do
+    user_home = System.user_home!()
+    desktop_path = Path.join(user_home, "Desktop")
+    File.mkdir_p!(desktop_path)
+
+    timestamp = DateTime.utc_now() |> DateTime.to_iso8601() |> String.replace(":", "-")
+    log_path = Path.join(desktop_path, "task_#{sanitize_filename(task_desc)}_#{timestamp}.log")
+
+    log_content = """
+    === TASK ERROR LOG ===
+    Timestamp: #{timestamp}
+    Task: #{task_desc}
+    Error: #{Exception.format(:error, error, stacktrace)}
+    """
+
+    File.write!(log_path, log_content)
+    log_path
+  end
+
+  defp sanitize_filename(name) do
+    name
+    |> String.replace(~r/[^a-zA-Z0-9_\-]/, "_")
+    |> String.slice(0, 40)
   end
 end

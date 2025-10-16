@@ -16,7 +16,7 @@ defmodule Aegis.Animation do
 
   alias Aurora.{Format, Normalize}
   alias Aurora.Structs.{ChunkText, FormatInfo}
-
+  alias Argos.AsyncTask
   @frames Application.compile_env(:aegis, :animations)[:frames] ||
             ["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"]
   @interval Application.compile_env(:aegis, :animations)[:interval] || 100
@@ -42,7 +42,7 @@ defmodule Aegis.Animation do
   end
 
   def stop do
-    Argos.stop_async_task(:animation_task)
+    AsyncTask.stop(:animation_task)
     show_cursor()
     clear_line()
     IO.puts("")
@@ -89,7 +89,7 @@ defmodule Aegis.Animation do
   cleanup suitable for TUI applications.
   """
   def stop_raw do
-    Argos.stop_async_task(:animation_task_raw)
+    AsyncTask.stop(:animation_task_raw)
     show_cursor()
     :ok
   end

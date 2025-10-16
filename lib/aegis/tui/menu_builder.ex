@@ -5,6 +5,8 @@ defmodule Aegis.Tui.MenuBuilder do
   Maneja estructuras MenuInfo, prepara opciones, y navega entre menús.
   """
 
+  import Argos.Command
+
   alias Aurora.Format
   alias Aegis.Printer
   alias Aegis.Structs.{MenuInfo, MenuOption, MenuState}
@@ -146,7 +148,7 @@ defmodule Aegis.Tui.MenuBuilder do
     %CommandResult{
       output: output,
       success?: success
-    } = Argos.exec_command(cmd)
+    } = exec!(cmd)
 
     if success, do: String.split(output, "\n"), else: String.split(lines, "\n")
   end

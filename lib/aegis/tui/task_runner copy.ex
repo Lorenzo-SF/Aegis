@@ -54,7 +54,7 @@
 
 #   Parámetros:
 #   - `task_descriptions`: lista de {desc, fn(callback)}
-#   - `opts`: header, refresh_interval, capture_output, mode, auto_resize
+#   - `opts`: header, refresh_interval, stderr_to_stdout, mode, auto_resize
 #   """
 #   def run(task_descriptions, opts \\ []) do
 #     header = Keyword.get(opts, :header, "Procesando tareas en paralelo")

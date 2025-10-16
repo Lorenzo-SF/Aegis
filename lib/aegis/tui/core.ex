@@ -39,7 +39,7 @@ defmodule Aegis.Tui.Core do
             # Salir directamente de la aplicación al presionar ESC
             Terminal.cleanup_raw_terminal()
             System.halt(0)
-          
+
           {:exit, result} ->
             result
         end
@@ -89,6 +89,7 @@ defmodule Aegis.Tui.Core do
 
       {:error, error} ->
         IO.puts("Error ejecutando acción: #{Exception.message(error)}")
+        IO.puts(inspect(option))
         pause_and_redraw(state)
 
       _ ->
