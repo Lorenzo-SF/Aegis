@@ -5,7 +5,7 @@ defmodule Aegis.Structs.PussyConfig do
   Esta estructura normaliza todas las operaciones con terminales (Kitty y Tmux),
   proporcionando una interfaz consistente y opciones configurables.
   """
-  
+
   @behaviour Access
 
   @type orientation :: :horizontal | :vertical
@@ -149,6 +149,7 @@ defmodule Aegis.Structs.PussyConfig do
   defp validate_shell(_), do: {:error, "shell must be a string"}
 
   defp validate_colors(%__MODULE__{colors: nil}), do: :ok
+
   defp validate_colors(%__MODULE__{colors: colors}) when is_map(colors) do
     required_keys = [:foreground, :background]
 
@@ -157,18 +158,24 @@ defmodule Aegis.Structs.PussyConfig do
       false -> {:error, "colors must have :foreground and :background keys"}
     end
   end
+
   defp validate_colors(_), do: {:error, "colors must be a map"}
 
   defp validate_orientation(%__MODULE__{orientation: nil}), do: :ok
+
   defp validate_orientation(%__MODULE__{orientation: orientation})
-    when orientation in [:horizontal, :vertical], do: :ok
+       when orientation in [:horizontal, :vertical],
+       do: :ok
+
   defp validate_orientation(_), do: {:error, "orientation must be :horizontal or :vertical"}
 
   defp validate_socket_path(%__MODULE__{socket_path: path}) when is_binary(path), do: :ok
   defp validate_socket_path(_), do: {:error, "socket_path must be a string"}
 
   defp validate_timeout(%__MODULE__{timeout: timeout})
-    when is_integer(timeout) and timeout > 0, do: :ok
+       when is_integer(timeout) and timeout > 0,
+       do: :ok
+
   defp validate_timeout(_), do: {:error, "timeout must be a positive integer"}
 
   @doc """

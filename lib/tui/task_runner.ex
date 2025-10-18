@@ -16,8 +16,9 @@ defmodule Aegis.Tui.TaskRunner do
   - Soporte dual: modo normal y modo raw
   """
 
-  alias Aegis.Tui.{Terminal, Renderer, LogoCache}
   alias Aegis.Printer
+  alias Aegis.Tui
+  alias Aegis.Tui.{MenuBuilder, Renderer, LogoCache}
   require Logger
 
   @refresh_interval 500
@@ -26,12 +27,12 @@ defmodule Aegis.Tui.TaskRunner do
   @logo_start_y 2
   @table_start_x 40
   @table_start_y 5
-  @header_offset 0
-  @separator_top_offset 0
-  @table_headers_offset 2
-  @separator_bottom_offset 2
-  @first_row_offset 4
-  @summary_spacing 3
+  @header_offset 2
+  @separator_top_offset 2
+  @table_headers_offset 4
+  @separator_bottom_offset 4
+  @first_row_offset 6
+  @summary_spacing 4
   @first_col_width 20
   @second_col_width 30
   @third_col_width 60
@@ -95,6 +96,13 @@ defmodule Aegis.Tui.TaskRunner do
     :ok
   end
 
+  def notify_step_with_path(callback, step_name, path, details \\ nil) do
+    base_step = if details, do: "#{step_name}: #{details}", else: step_name
+    step_text = "#{base_step} | Path: #{Path.basename(path)}"
+    callback.({:step, step_text})
+    :ok
+  end
+
   def notify_status(callback, status, context \\ %{}) do
     callback.({:status, status})
     if map_size(context) > 0, do: callback.({:context, context})
@@ -135,7 +143,7 @@ defmodule Aegis.Tui.TaskRunner do
   # Implementación interna
   # ============================
   defp run_with_raw_mode(task_descriptions, initial_state, header, description, refresh_interval) do
-    Terminal.with_terminal(fn ->
+    Tui.with_terminal(fn ->
       _ensure_logo_cache()
       ui_pid = spawn_link(fn -> _ui_loop(initial_state, header, refresh_interval, nil) end)
       task_results = _execute_tasks(task_descriptions, ui_pid)
@@ -154,7 +162,6 @@ defmodule Aegis.Tui.TaskRunner do
     end
 
     if LogoCache.get_logo() == nil do
-      alias Aegis.Tui.MenuBuilder
       LogoCache.set_logo(MenuBuilder.generate_menu_logo())
     end
   end
@@ -177,7 +184,11 @@ defmodule Aegis.Tui.TaskRunner do
             e ->
               log_path = _write_task_error_log(description, e, __STACKTRACE__)
               send(ui_pid, {:progress_update, index, {:error, {e, log_path}}})
-              Logger.error("Task #{description} failed: #{Exception.format(:error, e, __STACKTRACE__)}")
+
+              Logger.error(
+                "Task #{description} failed: #{Exception.format(:error, e, __STACKTRACE__)}"
+              )
+
               {description, :error, log_path}
           end
         end)
@@ -233,74 +244,100 @@ defmodule Aegis.Tui.TaskRunner do
   defp _update_task_state(state, task_id, progress_info) do
     Enum.map(state, fn task ->
       if task.id == task_id do
-        # Si la tarea ya está en estado de error, no permitimos más actualizaciones
-        # excepto para completar o recibir metadatos
-        if task.status == :error and not matches_any_type(progress_info, [:complete, :metadata, :context]) do
-          task
-        else
-          case progress_info do
-            {:step, step} ->
-              %{task | step: step, status: :processing}
-
-            progress when is_integer(progress) ->
-              %{task | progress: progress, status: :processing}
-
-            {:status, s} ->
-              %{task | status: s}
-
-            {:complete, _} ->
-              # Si la tarea tiene error, mantener el estado de error aun al completar
-              if task.status == :error do
-                task
-              else
-                %{task | status: :success, progress: 100}
-              end
-
-            {:error, error} ->
-              # Registrar el error para mostrarlo
-              %{task | status: :error, progress: 0, step: "Error: #{inspect(error)}"}
-
-            {:context, _} ->
-              task
-
-            {:metadata, _} ->
-              task
-
-            {:recovery_options, _} ->
-              task
-
-            {:severity, sev} ->
-              %{task | status: if(sev in [:high, :critical], do: :error, else: :success)}
-
-            {:category, _} ->
-              task
-
-            {:custom, _t, _d} ->
-              task
-
-            {:custom_options, _} ->
-              task
-
-            {:warning, w} ->
-              %{task | status: :success, step: "Warning: #{w}"}
-
-            {:info, i} ->
-              %{task | step: i}
-
-            _ ->
-              task
-          end
-        end
+        _update_task_for_progress(task, progress_info)
       else
         task
       end
     end)
   end
 
+  defp _update_task_for_progress(task, progress_info) do
+    # Si la tarea ya está en estado de error, no permitimos más actualizaciones
+    # excepto para completar o recibir metadatos
+    if task.status == :error and
+         not matches_any_type(progress_info, [:complete, :metadata, :context]) do
+      task
+    else
+      _apply_progress_update(task, progress_info)
+    end
+  end
+
+  defp _apply_progress_update(task, progress_info) do
+    case progress_info do
+      {:step, step} ->
+        _handle_step_update(task, step)
+
+      progress when is_integer(progress) ->
+        %{task | progress: progress, status: :processing}
+
+      {:status, s} ->
+        %{task | status: s}
+
+      {:complete, _} ->
+        _handle_completion(task)
+
+      {:error, {error, log_path}} ->
+        _handle_error_with_log(task, error, log_path)
+
+      {:error, error} ->
+        _handle_error(task, error)
+
+      {:severity, sev} ->
+        %{task | status: if(sev in [:high, :critical], do: :error, else: :success)}
+
+      {:warning, w} ->
+        %{task | status: :success, step: "Warning: #{w}"}
+
+      {:info, i} ->
+        %{task | step: i}
+
+      _ ->
+        task
+    end
+  end
+
+  defp _handle_step_update(task, step) do
+    display_step = truncate_step_smartly(step, @step_size)
+    %{task | step: display_step, status: :processing}
+  end
+
+  defp _handle_completion(task) do
+    # Si la tarea tiene error, mantener el estado de error aun al completar
+    if task.status == :error do
+      task
+    else
+      %{task | status: :success, progress: 100}
+    end
+  end
+
+  defp _handle_error_with_log(task, error, log_path) do
+    error_display = _format_error_message(error)
+    step_text = "Error: #{error_display} | Log: #{Path.basename(log_path)}"
+    %{task | status: :error, progress: 0, step: step_text}
+  end
+
+  defp _handle_error(task, error) do
+    error_display = _format_error_message(error)
+    %{task | status: :error, progress: 0, step: "Error: #{error_display}"}
+  end
+
+  defp _format_error_message(error) do
+    case error do
+      %{message: msg} -> msg
+      msg when is_binary(msg) -> msg
+      _ -> inspect(error)
+    end
+  end
+
   defp _render_async_ui(current_state, header, previous_state) do
     if previous_state == nil,
       do: _initialize_async_screen(current_state, header),
-      else: _update_changed_task_rows_and_refresh_static_content(current_state, previous_state, header)
+      else:
+        _update_changed_task_rows_and_refresh_static_content(
+          current_state,
+          previous_state,
+          header
+        )
   end
 
   defp _initialize_async_screen(state, header) do
@@ -313,13 +350,11 @@ defmodule Aegis.Tui.TaskRunner do
     IO.write("\e[?12l\e[?25l")
   end
 
-  defp _update_changed_task_rows(current_state, previous_state) do
-    Enum.each(_find_state_changes(current_state, previous_state), fn {task_id, task} ->
-      _render_task_row(task_id, task, @table_start_y)
-    end)
-  end
-
-  defp _update_changed_task_rows_and_refresh_static_content(current_state, previous_state, header) do
+  defp _update_changed_task_rows_and_refresh_static_content(
+         current_state,
+         _previous_state,
+         header
+       ) do
     # En lugar de actualizar solo filas cambiantes, volvemos a pintar todo el contenido
     # para asegurar que todo se mantenga visible y actualizado
     _render_full_screen(current_state, header)
@@ -435,37 +470,32 @@ defmodule Aegis.Tui.TaskRunner do
     |> String.pad_trailing(@description_size, " ")
     |> Printer.write_colored_at(pos_x: @table_start_x, pos_y: row_y, color: :secondary)
 
-    status_text =
-      Map.get(@status_labels, task.status, "") |> String.pad_trailing(@status_size, " ")
-
-    Printer.write_colored_at(status_text,
+    @status_labels
+    |> Map.get(task.status, "")
+    |> String.pad_trailing(@status_size, " ")
+    |> Printer.write_colored_at(
       pos_x: @table_start_x + @first_col_width,
       pos_y: row_y,
       color: task.status
     )
 
-    progress_text = Printer.render_progress_bar(task.progress)
-
-    Printer.write_colored_at(progress_text,
+    task.progress
+    |> Printer.render_progress_bar()
+    |> String.pad_trailing(@second_col_width, " ")
+    |> Printer.write_colored_at(
       pos_x: @table_start_x + @second_col_width,
       pos_y: row_y,
       color: task.status
     )
 
-    # Si el estado es error, mostrar el mensaje de error en la columna de step
-    step_text =
-      if task.status == :error and String.starts_with?(task.step, "Error:") do
-        String.slice(task.step, 0, @step_size)
-      else
-        String.slice(task.step, 0, @step_size)
-      end
+    task.step
+    |> String.slice(0, @step_size)
     |> String.pad_trailing(@step_size, " ")
-
-    Printer.write_colored_at(
-      step_text,
+    |> Printer.write_colored_at(
       pos_x: @table_start_x + @third_col_width,
       pos_y: row_y,
-      color: task.status  # Cambiado a task.status para que también se pinte en rojo en caso de error
+      # Cambiado a task.status para que también se pinte en rojo en caso de error
+      color: task.status
     )
   end
 
@@ -473,17 +503,6 @@ defmodule Aegis.Tui.TaskRunner do
     Enum.any?(types, fn type ->
       match?({^type, _}, progress_info)
     end)
-  end
-
-  defp _find_state_changes(current_state, previous_state) do
-    Enum.with_index(current_state)
-    |> Enum.filter(fn {cur, idx} ->
-      prev = Enum.at(previous_state, idx)
-
-      prev == nil or cur.status != prev.status or cur.progress != prev.progress or
-        cur.step != prev.step
-    end)
-    |> Enum.map(fn {task, idx} -> {idx, task} end)
   end
 
   # ============================
@@ -565,11 +584,37 @@ defmodule Aegis.Tui.TaskRunner do
     timestamp = DateTime.utc_now() |> DateTime.to_iso8601() |> String.replace(":", "-")
     log_path = Path.join(desktop_path, "task_#{sanitize_filename(task_desc)}_#{timestamp}.log")
 
+    # Extract more detailed error information
+    error_type = error.__struct__ || :unknown
+
+    error_message =
+      case error do
+        %{message: msg} -> msg
+        msg when is_binary(msg) -> msg
+        _ -> inspect(error)
+      end
+
     log_content = """
     === TASK ERROR LOG ===
     Timestamp: #{timestamp}
-    Task: #{task_desc}
-    Error: #{Exception.format(:error, error, stacktrace)}
+    Task Description: #{task_desc}
+    Error Type: #{error_type}
+    Error Message: #{error_message}
+
+    === FULL ERROR DETAILS ===
+    #{Exception.format(:error, error, stacktrace)}
+
+    === SYSTEM INFORMATION ===
+    Elixir Version: #{System.version()}
+    OTP Version: #{System.otp_release()}
+    System: #{inspect(:os.type())}
+    Working Directory: #{File.cwd!()}
+
+    === PROCESS INFORMATION ===
+    Process: #{inspect(self())}
+    Node: #{Node.self()}
+
+    === END LOG ===
     """
 
     File.write!(log_path, log_content)
@@ -580,5 +625,40 @@ defmodule Aegis.Tui.TaskRunner do
     name
     |> String.replace(~r/[^a-zA-Z0-9_\-]/, "_")
     |> String.slice(0, 40)
+  end
+
+  defp truncate_step_smartly(step, max_length) do
+    if String.length(step) <= max_length do
+      step
+    else
+      # If step contains a path indicator, prioritize showing the path
+      cond do
+        String.contains?(step, " | Path: ") ->
+          [main_part, path_part] = String.split(step, " | Path: ", parts: 2)
+          path_name = Path.basename(path_part)
+          available_for_main = max_length - String.length(" | ") - String.length(path_name)
+
+          if available_for_main > 10 do
+            truncated_main = String.slice(main_part, 0, available_for_main - 3) <> "..."
+            "#{truncated_main} | #{path_name}"
+          else
+            "...| #{path_name}"
+          end
+
+        String.contains?(step, " | Log: ") ->
+          [main_part, log_part] = String.split(step, " | Log: ", parts: 2)
+          available_for_main = max_length - String.length(" | Log: ") - String.length(log_part)
+
+          if available_for_main > 5 do
+            truncated_main = String.slice(main_part, 0, available_for_main)
+            "#{truncated_main} | Log: #{log_part}"
+          else
+            "Error | Log: #{log_part}"
+          end
+
+        true ->
+          String.slice(step, 0, max_length - 3) <> "..."
+      end
+    end
   end
 end

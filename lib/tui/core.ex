@@ -6,13 +6,48 @@ defmodule Aegis.Tui.Core do
   """
 
   require Logger
-  alias Aegis.Tui.{Terminal, Renderer, InputHandler, MenuBuilder}
+  alias Aegis.Tui
+  alias Aegis.Tui.{Renderer, InputHandler, MenuBuilder}
+
+  @doc """
+  Starts the TUI with provided options.
+  """
+  def start_tui(options) when is_list(options) do
+    # Convert simple string options to menu options
+    menu_options =
+      Enum.with_index(options, 1)
+      |> Enum.map(fn {option, index} ->
+        %{
+          id: index,
+          name: option,
+          description: option,
+          action_type: :execution,
+          action: {:execute, option}
+        }
+      end)
+
+    initial_state = %{
+      menu_info: %{
+        breadcrumbs: ["Main Menu"],
+        options: menu_options,
+        multiselect: false
+      },
+      filtered_options: menu_options,
+      cursor_index: 0,
+      selected_indices: MapSet.new(),
+      search_term: ""
+    }
+
+    Tui.with_terminal(fn ->
+      run_tui_loop(initial_state)
+    end)
+  end
 
   @doc """
   Ejecuta el bucle principal del TUI.
   """
   def run_tui_loop(state) do
-    Terminal.clear_from_cursor()
+    Tui.clear_from_cursor()
     Renderer.render_menu(state)
     input_loop(state)
   end
@@ -37,7 +72,7 @@ defmodule Aegis.Tui.Core do
 
           {:exit, :cancelled} ->
             # Salir directamente de la aplicación al presionar ESC
-            Terminal.cleanup_raw_terminal()
+            Tui.cleanup_raw_terminal()
             System.halt(0)
 
           {:exit, result} ->
@@ -76,6 +111,7 @@ defmodule Aegis.Tui.Core do
 
   defp handle_execution(state, option) do
     exit_raw_mode()
+
     result =
       try do
         MenuBuilder.execute_option_action(state, option)
@@ -100,19 +136,19 @@ defmodule Aegis.Tui.Core do
   end
 
   defp exit_raw_mode do
-    Terminal.cleanup_raw_terminal()
+    Tui.cleanup_raw_terminal()
     IO.write("\e[2J\e[H")
   end
 
   defp pause_and_redraw(state) do
     IO.puts("\nPresiona Enter para continuar...")
     IO.gets("")
-    Terminal.init_raw_terminal()
+    Tui.init_raw_terminal()
     redraw_menu(state)
   end
 
   defp redraw_menu(state) do
-    Terminal.clear_from_cursor()
+    Tui.clear_from_cursor()
     Renderer.render_menu(state)
   end
 end

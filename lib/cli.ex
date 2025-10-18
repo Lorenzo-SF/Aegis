@@ -1,9 +1,10 @@
 defmodule Aegis.CLI do
   @moduledoc """
   Command-line interface for Aegis CLI/TUI framework.
-  
+
   Provides functionality for colorful terminal output, tables, messages, and more.
   """
+  alias Aegis.Printer
 
   @doc """
   Main entry point for Aegis CLI commands.
@@ -15,19 +16,21 @@ defmodule Aegis.CLI do
   end
 
   defp parse_args(argv) do
-    case OptionParser.parse(argv, 
-      strict: [
-        color: :string,
-        align: :string,
-        headers: :string,
-        rows: :string,
-        compact: :boolean
-      ],
-      aliases: [
-        c: :color,
-        a: :align
-      ]
-    ) do
+    case OptionParser.parse(argv,
+           strict: [
+             color: :string,
+             align: :string,
+             headers: :string,
+             rows: :string,
+             compact: :boolean,
+             version: :boolean
+           ],
+           aliases: [
+             c: :color,
+             a: :align,
+             v: :version
+           ]
+         ) do
       {opts, args, _errors} ->
         {opts, args}
     end
@@ -73,6 +76,9 @@ defmodule Aegis.CLI do
       "clear" ->
         clear_command()
 
+      "version" ->
+        version()
+
       nil ->
         show_help()
 
@@ -83,14 +89,14 @@ defmodule Aegis.CLI do
 
   # Success message command
   defp success_command(args) do
-    message = 
+    message =
       case args do
         [_head | tail] -> Enum.join(tail, " ")
         [] -> ""
       end
-    
+
     if message != "" do
-      Aegis.success(message)
+      Printer.success(message)
     else
       IO.puts("Error: Missing message for success command")
       show_help()
@@ -99,14 +105,14 @@ defmodule Aegis.CLI do
 
   # Error message command
   defp error_command(args) do
-    message = 
+    message =
       case args do
         [_head | tail] -> Enum.join(tail, " ")
         [] -> ""
       end
-    
+
     if message != "" do
-      Aegis.error(message)
+      Printer.error(message)
     else
       IO.puts("Error: Missing message for error command")
       show_help()
@@ -115,14 +121,14 @@ defmodule Aegis.CLI do
 
   # Warning message command
   defp warning_command(args) do
-    message = 
+    message =
       case args do
         [_head | tail] -> Enum.join(tail, " ")
         [] -> ""
       end
-    
+
     if message != "" do
-      Aegis.warning(message)
+      Printer.warning(message)
     else
       IO.puts("Error: Missing message for warning command")
       show_help()
@@ -131,14 +137,14 @@ defmodule Aegis.CLI do
 
   # Info message command
   defp info_command(args) do
-    message = 
+    message =
       case args do
         [_head | tail] -> Enum.join(tail, " ")
         [] -> ""
       end
-    
+
     if message != "" do
-      Aegis.info(message)
+      Printer.info(message)
     else
       IO.puts("Error: Missing message for info command")
       show_help()
@@ -147,14 +153,14 @@ defmodule Aegis.CLI do
 
   # Debug message command
   defp debug_command(args) do
-    message = 
+    message =
       case args do
         [_head | tail] -> Enum.join(tail, " ")
         [] -> ""
       end
-    
+
     if message != "" do
-      Aegis.debug(message)
+      Printer.debug(message)
     else
       IO.puts("Error: Missing message for debug command")
       show_help()
@@ -162,19 +168,19 @@ defmodule Aegis.CLI do
   end
 
   # Table command
-  defp table_command(opts, args) do
+  defp table_command(opts, _args) do
     headers_str = opts[:headers]
     rows_str = opts[:rows]
-    
+
     if headers_str && rows_str do
       headers = String.split(headers_str, ",")
-      
-      rows = 
+
+      rows =
         rows_str
         |> String.split(";")
         |> Enum.map(fn row -> String.split(row, ",") end)
-      
-      Aegis.table(headers, rows)
+
+      Printer.table(headers, rows)
     else
       IO.puts("Error: Missing headers or rows for table command")
       show_help()
@@ -183,14 +189,14 @@ defmodule Aegis.CLI do
 
   # Header command
   defp header_command(args) do
-    text = 
+    text =
       case args do
         [_head | tail] -> Enum.join(tail, " ")
         [] -> ""
       end
-    
+
     if text != "" do
-      Aegis.header([text])
+      Printer.header([text])
     else
       IO.puts("Error: Missing text for header command")
       show_help()
@@ -199,20 +205,20 @@ defmodule Aegis.CLI do
 
   # Separator command
   defp separator_command() do
-    Aegis.separator()
+    Printer.separator()
   end
 
   # Question command
   defp question_command(args) do
-    text = 
+    text =
       case args do
         [_head | tail] -> Enum.join(tail, " ")
         [] -> ""
       end
-    
+
     if text != "" do
       # Since this is CLI context, just print the question
-      Aegis.question(text)
+      Printer.question(text)
     else
       IO.puts("Error: Missing message for question command")
       show_help()
@@ -221,15 +227,15 @@ defmodule Aegis.CLI do
 
   # Confirm (yesno) command
   defp confirm_command(args) do
-    text = 
+    text =
       case args do
         [_head | tail] -> Enum.join(tail, " ")
         [] -> ""
       end
-    
+
     if text != "" do
       # Since this is CLI context, just print the confirmation
-      Aegis.yesno(text)
+      Printer.yesno(text)
     else
       IO.puts("Error: Missing text for confirm command")
       show_help()
@@ -238,15 +244,15 @@ defmodule Aegis.CLI do
 
   # Animate command
   defp animate_command(args) do
-    text = 
+    text =
       case args do
         [_head | tail] -> Enum.join(tail, " ")
         [] -> ""
       end
-    
+
     if text != "" do
       # Start animation and exit immediately in CLI context
-      Aegis.start_animation([{text, :primary}])
+      Printer.animation([{text, :primary}])
     else
       IO.puts("Error: Missing text for animate command")
       show_help()
@@ -255,59 +261,65 @@ defmodule Aegis.CLI do
 
   # Clear command
   defp clear_command() do
-    Aegis.clear_screen()
+    Terminal.clear_screen()
   end
 
   defp show_help() do
     help_text = """
     Aegis CLI - CLI/TUI framework for colorful terminal output
-    
+
     Usage:
       aegis [COMMAND] [OPTIONS] [ARGUMENTS]
-    
+
     Commands:
       success   Display a success message
                 Usage: aegis success "Operation completed"
-    
+
       error     Display an error message
                 Usage: aegis error "An error occurred"
-    
+
       warning   Display a warning message
                 Usage: aegis warning "This is a warning"
-    
+
       info      Display an info message
                 Usage: aegis info "Processing information"
-    
+
       debug     Display a debug message
                 Usage: aegis debug "Debug information"
-    
+
       table     Display a formatted table
                 Usage: aegis table --headers "Name,Age,City" --rows "John,30,Madrid;Ana,25,Barcelona"
-    
+
       header    Display a formatted header
                 Usage: aegis header "Welcome to Aegis"
-    
+
       separator Display a visual separator
                 Usage: aegis separator
-    
+
       question  Display a question (in CLI context just prints)
                 Usage: aegis question "Are you sure?"
-    
+
       confirm   Display a yes/no confirmation (in CLI context just prints)
                 Usage: aegis confirm "Continue?"
-    
+
       animate   Start an animation (in CLI context just starts)
                 Usage: aegis animate "Loading..."
-    
+
       clear     Clear the screen
                 Usage: aegis clear
-    
+
     Options:
       -c, --color COLOR     Color name (primary, error, success, etc.)
       -a, --align ALIGN     Alignment (left, right, center)
           --headers         Comma-separated column headers for table
           --rows            Semicolon-separated rows for table, with comma-separated values
     """
+
     IO.puts(help_text)
+  end
+
+  def version do
+    config = Mix.Project.config()
+    IO.puts("#{config[:app]} v#{config[:version]}")
   end
 end

@@ -6,7 +6,7 @@ defmodule Aegis.Tui.TreeNavigator do
   y permite navegación usando el menú TUI.
   """
 
-  alias Aegis.{Printer}
+  alias Aegis.Printer
   alias Aegis.Tui
 
   @doc """
@@ -59,6 +59,7 @@ defmodule Aegis.Tui.TreeNavigator do
     |> Enum.filter(&backup_folder?/1)
     |> Enum.map(fn path ->
       display_name = format_backup_display_name(path)
+
       %{
         key: String.to_atom("backup_#{:erlang.phash2(path)}"),
         display: display_name,
@@ -76,6 +77,7 @@ defmodule Aegis.Tui.TreeNavigator do
 
   defp format_backup_display_name(path) do
     parts = String.split(path, "/")
+
     case Enum.reverse(parts) do
       [date_folder, context | _] -> "#{context} / #{date_folder}"
       [date_folder] -> date_folder

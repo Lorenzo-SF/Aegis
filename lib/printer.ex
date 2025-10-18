@@ -4,13 +4,12 @@ defmodule Aegis.Printer do
 
   Nivel 2 del framework - CLI/TUI. Depende de Aurora (1A) y Pandr (1B).
   """
-  require Argos.Command
+  import Argos.Command
   require Logger
 
+  alias Aegis.{Animation, Terminal}
   alias Aurora.{Color, Convert, Format}
   alias Aurora.Structs.{ChunkText, ColorInfo, EffectInfo, FormatInfo}
-  alias Aegis.Tui.Terminal
-  alias Aegis.{Animation, Terminal}
 
   @default_separator_char "="
   @default_separator_color :secondary
@@ -253,13 +252,13 @@ defmodule Aegis.Printer do
   Save cursor position.
   """
   @spec save_cursor() :: :ok
-  def save_cursor(), do: IO.write("\e[s")
+  def save_cursor, do: IO.write("\e[s")
 
   @doc """
   Restore cursor position.
   """
   @spec restore_cursor() :: :ok
-  def restore_cursor(), do: IO.write("\e[u")
+  def restore_cursor, do: IO.write("\e[u")
 
   @doc """
   Position cursor at specific coordinates without writing anything.
@@ -295,10 +294,10 @@ defmodule Aegis.Printer do
   end
 
   defp get_table_offset_raw(table_width, :center),
-    do: div(max(Terminal.terminal_width() - table_width, 0), 2)
+    do: div(max(Terminal.width() - table_width, 0), 2)
 
   defp get_table_offset_raw(table_width, :right),
-    do: max(Terminal.terminal_width() - table_width, 0)
+    do: max(Terminal.width() - table_width, 0)
 
   defp get_table_offset_raw(_, _), do: 0
 
@@ -364,7 +363,7 @@ defmodule Aegis.Printer do
     char = Keyword.get(opts, :char, @default_separator_char)
     color = Keyword.get(opts, :color, @default_separator_color)
     align = Keyword.get(opts, :align, @default_separator_align)
-    width = Terminal.terminal_width(size)
+    width = Terminal.width()
 
     len =
       case size do
@@ -382,7 +381,11 @@ defmodule Aegis.Printer do
     color = Keyword.get(opts, :color, :primary)
     align = Keyword.get(opts, :align, :center)
     separator(color: color, align: align)
-    Enum.each(texts, fn t -> message(chunks: [Convert.to_chunk({t, color})], align: align) end)
+
+    # Normalize texts to always be a list
+    text_list = if is_list(texts), do: texts, else: [texts]
+
+    Enum.each(text_list, fn t -> message(chunks: [Convert.to_chunk({t, color})], align: align) end)
     separator(color: color, align: align)
   end
 
@@ -397,117 +400,49 @@ defmodule Aegis.Printer do
 
   defp message_with_icon(text, icon, opts) do
     color = Keyword.get(opts, :color, Color.get_default_color())
-    opts = [messages: [{"#{icon} #{text}", color}]] ++ opts
+    opts = Keyword.put(opts, :messages, [{"#{icon} #{text}", color}])
     message(opts)
   end
 
-  @doc """
-  Print an informational message with [i] icon.
+# -------------------
+# Funciones públicas con defaults
+# -------------------
 
-  ## Examples
+  @doc "Print an informational message with [i] icon."
+  @spec info(String.t(), Keyword.t()) :: :ok
+  def info(text, opts \\ []), do: message_with_icon(text, "[i]", Keyword.merge([color: :info, align: :left, add_line: :none], opts))
 
-      iex> Aegis.Printer.info("Processing data...")
-      :ok
-  """
-  @spec info(String.t(), :left | :center | :right) :: :ok
-  def info(text, align \\ :left),
-    do: message_with_icon(text, "[i]", color: :info, align: align, add_line: :none)
+  @doc "Print a warning message with [!] icon."
+  @spec warning(String.t(), Keyword.t()) :: :ok
+  def warning(text, opts \\ []), do: message_with_icon(text, "[!]", Keyword.merge([color: :warning, align: :left, add_line: :both], opts))
 
-  @doc """
-  Print a warning message with [!] icon.
+  @doc "Print a success message with [✓] icon."
+  @spec success(String.t(), Keyword.t()) :: :ok
+  def success(text, opts \\ []), do: message_with_icon(text, "[✓]", Keyword.merge([color: :success, align: :left], opts))
 
-  ## Examples
+  @doc "Print an error message with [X] icon."
+  @spec error(String.t(), Keyword.t()) :: :ok
+  def error(text, opts \\ []), do: message_with_icon(text, "[X]", Keyword.merge([color: :error, align: :left, add_line: :both], opts))
 
-      iex> Pandr.Printer.warning("Be careful with this operation")
-      :ok
-  """
-  @spec warning(String.t(), :left | :center | :right) :: :ok
-  def warning(text, align \\ :left),
-    do: message_with_icon(text, "[!]", color: :warning, align: align, add_line: :both)
+  @doc "Print a debug message with [d] icon."
+  @spec debug(String.t(), Keyword.t()) :: :ok
+  def debug(text, opts \\ []), do: message_with_icon(text, "[d]", Keyword.merge([color: :debug, align: :left, add_line: :none], opts))
 
-  @doc """
-  Print a success message with [✓] icon.
+  @doc "Print a notice message with [n] icon."
+  @spec notice(String.t(), Keyword.t()) :: :ok
+  def notice(text, opts \\ []), do: message_with_icon(text, "[n]", Keyword.merge([color: :notice, align: :left, add_line: :none], opts))
 
-  ## Examples
+  @doc "Print a critical message with [!C] icon."
+  @spec critical(String.t(), Keyword.t()) :: :ok
+  def critical(text, opts \\ []), do: message_with_icon(text, "[!C]", Keyword.merge([color: :critical, align: :left, add_line: :both], opts))
 
-      iex> Pandr.Printer.success("Operation completed successfully")
-      :ok
-  """
-  @spec success(String.t(), :left | :center | :right) :: :ok
-  def success(text, align \\ :left),
-    do: message_with_icon(text, "[✓]", color: :success, align: align)
+  @doc "Print an alert message with [!A] icon."
+  @spec alert(String.t(), Keyword.t()) :: :ok
+  def alert(text, opts \\ []), do: message_with_icon(text, "[!A]", Keyword.merge([color: :alert, align: :left, add_line: :both], opts))
 
-  @doc """
-  Print an error message with [X] icon.
-
-  ## Examples
-
-      iex> Pandr.Printer.error("Something went wrong")
-      :ok
-  """
-  @spec error(String.t(), :left | :center | :right) :: :ok
-  def error(text, align \\ :left),
-    do: message_with_icon(text, "[X]", color: :error, align: align, add_line: :both)
-
-  @doc """
-  Print a debug message with [d] icon.
-
-  ## Examples
-
-      iex> Pandr.Printer.debug("Debug information")
-      :ok
-  """
-  @spec debug(String.t(), :left | :center | :right) :: :ok
-  def debug(text, align \\ :left),
-    do: message_with_icon(text, "[d]", color: :debug, align: align, add_line: :none)
-
-  @doc """
-  Print a notice message with [n] icon.
-
-  ## Examples
-
-      iex> Pandr.Printer.notice("Please note this information")
-      :ok
-  """
-  @spec notice(String.t(), :left | :center | :right) :: :ok
-  def notice(text, align \\ :left),
-    do: message_with_icon(text, "[n]", color: :notice, align: align, add_line: :none)
-
-  @doc """
-  Print a critical message with [!C] icon.
-
-  ## Examples
-
-      iex> Pandr.Printer.critical("Critical system error")
-      :ok
-  """
-  @spec critical(String.t(), :left | :center | :right) :: :ok
-  def critical(text, align \\ :left),
-    do: message_with_icon(text, "[!C]", color: :critical, align: align, add_line: :both)
-
-  @doc """
-  Print an alert message with [!A] icon.
-
-  ## Examples
-
-      iex> Pandr.Printer.alert("Alert: immediate attention required")
-      :ok
-  """
-  @spec alert(String.t(), :left | :center | :right) :: :ok
-  def alert(text, align \\ :left),
-    do: message_with_icon(text, "[!A]", color: :alert, align: align, add_line: :both)
-
-  @doc """
-  Print an emergency message with [!!!] icon.
-
-  ## Examples
-
-      iex> Pandr.Printer.emergency("System failure - immediate action required")
-      :ok
-  """
-  @spec emergency(String.t(), :left | :center | :right) :: :ok
-  def emergency(text, align \\ :left),
-    do: message_with_icon(text, "[!!!]", color: :emergency, align: align, add_line: :both)
+  @doc "Print an emergency message with [!!!] icon."
+  @spec emergency(String.t(), Keyword.t()) :: :ok
+  def emergency(text, opts \\ []), do: message_with_icon(text, "[!!!]", Keyword.merge([color: :emergency, align: :left, add_line: :both], opts))
 
   def animation(messages, align \\ :left) do
     Animation.stop()
@@ -576,10 +511,10 @@ defmodule Aegis.Printer do
   end
 
   defp get_table_offset(table_width, :center),
-    do: div(max(Terminal.terminal_width() - table_width, 0), 2)
+    do: div(max(Terminal.width() - table_width, 0), 2)
 
   defp get_table_offset(table_width, :right),
-    do: max(Terminal.terminal_width() - table_width, 0)
+    do: max(Terminal.width() - table_width, 0)
 
   defp get_table_offset(_, _), do: 0
 
@@ -619,9 +554,11 @@ defmodule Aegis.Printer do
 
         Enum.each(chunks, fn %ChunkText{text: text} ->
           formatted_text = apply_formatting([text], opts)
-          cmd = "echo '#{formatted_text}' | gterm '#{gradients}'"
-          result = Argos.Command.exec!(cmd)
-          IO.puts(result)
+
+          "echo '#{formatted_text}' | gterm '#{gradients}'"
+          |> exec!()
+          |> Map.get(:output)
+          |> IO.puts()
         end)
 
       Keyword.has_key?(opts, :messages) ->
@@ -633,9 +570,10 @@ defmodule Aegis.Printer do
             |> Enum.join(" ")
             |> apply_formatting(opts)
 
-          cmd = "echo '#{formatted_text}' | gterm '#{gradients}'"
-          result = Argos.Command.exec!(cmd)
-          IO.puts(result)
+          "echo '#{formatted_text}' | gterm '#{gradients}'"
+          |> exec!()
+          |> Map.get(:output)
+          |> IO.puts()
         else
           Enum.each(messages, fn msg -> message(message: msg) end)
         end
@@ -644,9 +582,11 @@ defmodule Aegis.Printer do
         message = to_string(Keyword.get(opts, :message))
 
         formatted_text = apply_formatting([message], opts)
-        cmd = "echo '#{formatted_text}' | gterm '#{gradients}'"
-        result = Argos.Command.exec!(cmd)
-        IO.puts(result)
+
+        "echo '#{formatted_text}' | gterm '#{gradients}'"
+        |> exec!()
+        |> Map.get(:output)
+        |> IO.puts()
 
       true ->
         :ok
@@ -786,8 +726,11 @@ defmodule Aegis.Printer do
     gradients = Enum.map_join(gradient_hexes, " ", fn h -> "'#{h}'" end)
 
     # Execute the command and handle the CommandResult properly
-    result = Argos.Command.exec!("echo '#{lines}' | gterm #{gradients}")
-    IO.puts(result.output)
+    "echo '#{lines}' | gterm #{gradients}"
+    |> exec!()
+    |> Map.get(:output)
+    |> IO.puts()
+
     :ok
   end
 
@@ -824,7 +767,7 @@ defmodule Aegis.Printer do
   end
 
   def get_header_logo do
-    {width, _height} = Terminal.terminal_size()
+    {width, _height} = Terminal.size()
 
     cond do
       width <= 80 -> @micro_header
@@ -842,9 +785,11 @@ defmodule Aegis.Printer do
 
     gradients = Enum.map_join(gradient_hexes, " ", fn h -> "'#{h}'" end)
 
-    # Execute the command and handle the CommandResult properly
-    result = Argos.Command.exec!("echo '#{lines}' | gterm #{gradients}")
-    IO.puts(result.output)
+    "echo '#{lines}' | gterm #{gradients}"
+    |> exec!()
+    |> Map.get(:output)
+    |> IO.puts()
+
     :ok
   end
 
@@ -868,15 +813,6 @@ defmodule Aegis.Printer do
     else
       _ -> "[????]"
     end
-  end
-
-  @doc """
-  Limpia la pantalla del terminal.
-  """
-  @spec clear_screen() :: :ok
-  def clear_screen do
-    Terminal.clear_screen()
-    :ok
   end
 
   def breadcrumbs(breadcrumbs, opts \\ []) when is_list(breadcrumbs) do
@@ -1066,7 +1002,7 @@ defmodule Aegis.Printer do
 
     for align <- [:left, :center, :right] do
       Terminal.clear_screen()
-      semiheader("Breadcrums", color: :happy, align: :center)
+      semiheader("breadcrumbs", color: :happy, align: :center)
 
       breadcrumbs(
         [
@@ -1077,7 +1013,7 @@ defmodule Aegis.Printer do
           %ChunkText{text: "#{c5} > ", color: Color.get_color_info(c5)},
           %ChunkText{text: "#{c6} > ", color: Color.get_color_info(c6)}
         ],
-        align
+        align: align
       )
 
       question("Pulsa ENTER para continuar...")

@@ -1,4 +1,4 @@
-defmodule Aegis.Structs.MenuState  do
+defmodule Aegis.Structs.MenuState do
   @moduledoc "Menu state structure for CLI menu management."
   alias Aegis.Structs.MenuInfo
 

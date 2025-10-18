@@ -14,9 +14,10 @@ defmodule Aegis.Animation do
       :ok
   """
 
+  alias Argos.AsyncTask
   alias Aurora.{Format, Normalize}
   alias Aurora.Structs.{ChunkText, FormatInfo}
-  alias Argos.AsyncTask
+
   @frames Application.compile_env(:aegis, :animations)[:frames] ||
             ["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"]
   @interval Application.compile_env(:aegis, :animations)[:interval] || 100
@@ -32,7 +33,7 @@ defmodule Aegis.Animation do
 
     chunks = Normalize.normalize_messages(messages)
 
-    Argos.start_async_task(
+    AsyncTask.start(
       :animation_task,
       fn _ -> animate_loop(@frames, chunks, align) end,
       []
@@ -73,7 +74,7 @@ defmodule Aegis.Animation do
 
     chunks = Normalize.normalize_messages(messages)
 
-    Argos.start_async_task(
+    AsyncTask.start(
       :animation_task_raw,
       fn _ -> animate_loop_raw(@frames, chunks, x, y, align) end,
       []

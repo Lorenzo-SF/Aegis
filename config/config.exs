@@ -106,6 +106,11 @@ config :aegis, :terminal,
   shell_timeout: 5000,
   shell: "/bin/zsh"
 
+
+config :aegis, :sessions,
+  tmux_session: "",
+  tmux_config_path: "~/.tmux.conf"
+
 # -------------------------------------------
 # -- Deps
 # -------------------------------------------

@@ -9,10 +9,10 @@ defmodule Aegis.Terminal.ModuleRepoInfo do
   ]
 
   @type t :: %__MODULE__{
-    url: String.t(),
-    branch: String.t(),
-    commit: String.t()
-  }
+          url: String.t(),
+          branch: String.t(),
+          commit: String.t()
+        }
 
   def from_map(map) when is_map(map) do
     %__MODULE__{

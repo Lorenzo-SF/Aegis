@@ -36,7 +36,8 @@ defmodule Aegis.Tui.LogoCache do
   def handle_call(:get_logo, _from, %{logo: logo} = state), do: {:reply, logo, state}
 
   @impl true
-  def handle_call({:set_logo, logo_lines}, _from, state), do: {:reply, :ok, %{state | logo: logo_lines}}
+  def handle_call({:set_logo, logo_lines}, _from, state),
+    do: {:reply, :ok, %{state | logo: logo_lines}}
 
   @impl true
   def handle_call(:clear_logo, _from, state), do: {:reply, :ok, %{state | logo: nil}}

@@ -8,9 +8,9 @@ defmodule Aegis.Terminal.ModuleIndexInfo do
   ]
 
   @type t :: %__MODULE__{
-    name: String.t(),
-    script: String.t()
-  }
+          name: String.t(),
+          script: String.t()
+        }
 
   def from_map(map) when is_map(map) do
     %__MODULE__{

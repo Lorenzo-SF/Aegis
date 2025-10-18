@@ -67,10 +67,18 @@ defmodule Aegis.Tui.InputHandler do
     case IO.getn("", 1) do
       "[" ->
         case IO.getn("", 1) do
-          "A" -> {:ok, :up_arrow}
-          "B" -> {:ok, :down_arrow}
-          "C" -> {:ok, :right_arrow}
-          "D" -> {:ok, :left_arrow}
+          "A" ->
+            {:ok, :up_arrow}
+
+          "B" ->
+            {:ok, :down_arrow}
+
+          "C" ->
+            {:ok, :right_arrow}
+
+          "D" ->
+            {:ok, :left_arrow}
+
           _ ->
             {:ok, @key_escape}
         end
@@ -90,11 +98,14 @@ defmodule Aegis.Tui.InputHandler do
 
   defp toggle_selection(state, select) do
     case selected_option(state) do
-      nil -> {:continue, state}
+      nil ->
+        {:continue, state}
+
       option ->
         updated =
-          if select, do: MapSet.put(state.selected_indices, option.id),
-             else: MapSet.delete(state.selected_indices, option.id)
+          if select,
+            do: MapSet.put(state.selected_indices, option.id),
+            else: MapSet.delete(state.selected_indices, option.id)
 
         {:continue, %{state | selected_indices: updated}}
     end
@@ -106,14 +117,24 @@ defmodule Aegis.Tui.InputHandler do
         state.menu_info.options
       else
         search = String.downcase(search_term)
+
         Enum.filter(state.menu_info.options, fn option ->
           String.contains?(String.downcase(option.name), search) or
             String.contains?(String.downcase(option.description || ""), search)
         end)
       end
 
-    new_cursor = if filtered_options != [], do: min(state.cursor_index, length(filtered_options) - 1), else: 0
+    new_cursor =
+      if filtered_options != [],
+        do: min(state.cursor_index, length(filtered_options) - 1),
+        else: 0
 
-    {:update_search, %{state | search_term: search_term, filtered_options: filtered_options, cursor_index: new_cursor}}
+    {:update_search,
+     %{
+       state
+       | search_term: search_term,
+         filtered_options: filtered_options,
+         cursor_index: new_cursor
+     }}
   end
 end

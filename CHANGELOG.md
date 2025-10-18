@@ -57,7 +57,7 @@ Primera versión estable de Aegis como CLI/TUI Framework para Elixir.
 - `Aegis.Tui.Core` - Núcleo del sistema TUI
 - `Aegis.Tui.InputHandler` - Manejo de entrada de usuario
 - `Aegis.Tui.Renderer` - Renderizado de interfaces
-- `Aegis.Tui.Terminal` - Control de terminal
+- `Aegis.Tui` - Control de terminal
 - `Aegis.Tui.TaskRunner` - Ejecución de tareas con UI
 - `Aegis.Tui.TreeNavigator` - Navegación por árboles
 - `Aegis.Tui.LogoCache` - Cache de logos
@@ -89,8 +89,8 @@ Primera versión estable de Aegis como CLI/TUI Framework para Elixir.
 - `Aegis.list_elements/1` - Listado de elementos
 - `Aegis.find_element/1` - Búsqueda de elementos
 - `Aegis.autoresize/2` - Auto-redimensionamiento
-- `Aegis.terminal_size/0` - Obtención de tamaño de terminal
-- `Aegis.terminal_width/1` - Obtención de ancho de terminal
+- `Aegis.size/0` - Obtención de tamaño de terminal
+- `Aegis.width/1` - Obtención de ancho de terminal
 - `Aegis.available?/0` - Verificación de disponibilidad
 
 ### 🌀 Sistema de Animaciones
@@ -176,13 +176,13 @@ Primera versión alpha de Aegis como parte del refactor de Proyecto Ypsilon.
 
 ## Versión 1.0.1 (2025-09-24)
 
-### 
+###
 
 - Refactor de "Tui" porque en algunas ocasiones da problemas de compilacion
 
 ## Versión 1.0.0 (2025-09-24)
 
-### 
+###
 
 - Publicacion libreria
 
